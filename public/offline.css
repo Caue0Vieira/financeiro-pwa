@@ -1,0 +1,22 @@
+:root {
+  color-scheme: light dark;
+  font: 16px system-ui, sans-serif;
+  background: #f5f4ef;
+  color: #242a26;
+}
+body {
+  display: grid;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 24px;
+  box-sizing: border-box;
+  place-items: center;
+}
+main { max-width: 24rem; }
+h1 { font-size: 2rem; letter-spacing: -0.04em; }
+p { line-height: 1.55; }
+a { color: #305747; }
+@media (prefers-color-scheme: dark) {
+  :root { background: #151916; color: #e7ebe5; }
+  a { color: #b0c9b6; }
+}

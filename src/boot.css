@@ -1,0 +1,25 @@
+.boot {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background: #f5f4ef;
+  color: #242a26;
+}
+
+.boot h1 { margin: 0; font-size: clamp(1.75rem, 5vw, 2.5rem); }
+.boot-message { display: grid; gap: 16px; justify-items: center; }
+.connection-notice {
+  padding: 12px 18px;
+  color: #3f310f;
+  background: #f0e4c4;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .boot { background: #151916; color: #e7ebe5; }
+  .connection-notice { color: #f0e4c4; background: #3f310f; }
+}

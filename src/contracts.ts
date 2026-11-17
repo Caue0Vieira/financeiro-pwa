@@ -1,0 +1,126 @@
+export type EntryKind = 'income' | 'expense' | 'transfer' | 'card_payment' | 'investment' | 'saving' | 'refund' | 'uncategorized';
+export type EntryStatus = 'planned' | 'confirmed';
+export type Source = 'manual' | 'statement' | 'invoice' | 'installment' | 'recurrence';
+
+export interface Entry {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  kind: EntryKind;
+  category: string;
+  status: EntryStatus;
+  source: Source;
+  accountId?: string;
+  cardId?: string;
+  recurrenceId?: string;
+  installmentNumber?: number;
+  installmentCount?: number;
+  invoiceMonth?: string;
+  allocatedAmount?: number;
+}
+
+export interface Account { id: string; name: string }
+export interface Card { id: string; name: string; dueDay: number }
+export interface Investment {
+  id: string;
+  institution: string;
+  name: string;
+  contributed: number;
+  value: number;
+  updatedOn: string;
+}
+export interface Recurrence {
+  id: string;
+  description: string;
+  amount: number;
+  kind: 'income' | 'expense';
+  category: string;
+  startMonth: string;
+  day: number;
+  endMonth?: string;
+}
+export interface Invoice {
+  cardId: string;
+  month: string;
+  dueDate: string;
+  total: number;
+  paid: number;
+}
+export interface Coverage { month: string; from: string; to: string }
+export interface Profile { name: string; avatarUrl?: string }
+export interface Session { email: string }
+
+export interface Dashboard {
+  month: string;
+  profile: Profile;
+  received: number;
+  expectedIncome: number;
+  expenses: number;
+  toPay: number;
+  projectedSurplus: number;
+  goal: number;
+  saved: number;
+  cashIn: number;
+  cashOut: number;
+  invested: number;
+  recent: Entry[];
+  upcoming: Entry[];
+  trend: { month: string; income: number; expenses: number }[];
+  categories: { name: string; amount: number }[];
+  accounts: Account[];
+  cards: Card[];
+  investments: Investment[];
+  recurrences: Recurrence[];
+  invoices: Invoice[];
+  coverage: Coverage[];
+}
+
+export type Action =
+  | { type: 'saveEntry'; entry: Omit<Entry, 'id' | 'source'> & { id?: string } }
+  | { type: 'deleteEntry'; id: string }
+  | { type: 'saveAccount'; account: Omit<Account, 'id'> & { id?: string } }
+  | { type: 'saveCard'; card: Omit<Card, 'id'> & { id?: string } }
+  | { type: 'saveInvestment'; investment: Omit<Investment, 'id'> & { id?: string } }
+  | { type: 'deleteInvestment'; id: string }
+  | { type: 'saveRecurrence'; recurrence: Omit<Recurrence, 'id'> & { id?: string }; effectiveMonth?: string }
+  | { type: 'endRecurrence'; id: string; endMonth: string }
+  | { type: 'addInstallments'; cardId: string; description: string; category: string; total: number; count: number; firstMonth: string }
+  | { type: 'saveGoal'; month: string; amount: number }
+  | { type: 'settleInvoice'; paymentId: string; cardId: string; month: string; amount: number };
+
+export interface ImportRow {
+  date: string;
+  description: string;
+  amount: number;
+  kind: EntryKind;
+  category: string;
+  externalId?: string;
+  installmentNumber?: number;
+  installmentCount?: number;
+  matchId?: string;
+}
+export interface ImportPayload {
+  type: 'statement' | 'invoice';
+  accountId?: string;
+  cardId?: string;
+  month?: string;
+  fileHash: string;
+  from?: string;
+  to?: string;
+  rows: ImportRow[];
+}
+export interface ImportResult { inserted: number; linked: number; skipped: number }
+
+export interface FinanceService {
+  session(): Promise<Session | null>;
+  onSessionChange(listener: (session: Session | null) => void): () => void;
+  signIn(email: string, password: string): Promise<void>;
+  signOut(): Promise<void>;
+  dashboard(month: string): Promise<Dashboard>;
+  history(month: string, offset: number, limit: number): Promise<Entry[]>;
+  mutate(action: Action): Promise<void>;
+  confirmImport(payload: ImportPayload): Promise<ImportResult>;
+  saveProfile(name: string, avatar?: File | null): Promise<void>;
+  changePassword(current: string, next: string): Promise<void>;
+}

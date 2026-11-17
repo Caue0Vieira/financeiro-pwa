@@ -1,0 +1,30 @@
+{
+  "name": "financeiro-pwa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.22.3 <25"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --outDir .cloudflare/output/v1/workers/default/assets",
+    "test": "node --test --test-isolation=none"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
+    "lucide-react": "1.55.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-rc.1",
+    "@electric-sql/pglite": "0.5.8",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "cf": "1.0.0-rc.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  }
+}

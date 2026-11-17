@@ -1,0 +1,260 @@
+import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence } from '../contracts';
+import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date';
+
+export function createDemoService(): FinanceService {
+  const month = currentMonth();
+  const accounts: Account[] = [{ id: 'conta', name: 'Conta principal' }];
+  const cards: Card[] = [{ id: 'cartao', name: 'Meu cartão', dueDay: 24 }];
+  const investments: Investment[] = [
+    { id: 'reserva', institution: 'Banco Horizonte', name: 'Reserva de emergência', contributed: 650000, value: 689740, updatedOn: todayInSaoPaulo() },
+    { id: 'tesouro', institution: 'Corretora Pontal', name: 'Tesouro Selic', contributed: 520000, value: 554820, updatedOn: todayInSaoPaulo() },
+  ];
+  const recurrences: Recurrence[] = [
+    { id: 'internet', description: 'Internet residencial', amount: -11990, kind: 'expense', category: 'Moradia', startMonth: month, day: 26 },
+    { id: 'streaming', description: 'Streaming', amount: -4490, kind: 'expense', category: 'Assinaturas', startMonth: month, day: 28 },
+  ];
+  const profile: Profile = { name: 'Minha conta' };
+  const goals = new Map<string, number>([[month, 90000]]);
+  const imported = new Set<string>();
+  const externalIds = new Set<string>();
+  const coverage: Coverage[] = [];
+  const allocations: { paymentId: string; cardId: string; month: string; amount: number }[] = [];
+  const entries: Entry[] = [];
+
+  const seed = (date: string, description: string, amount: number, kind: Entry['kind'], category: string, rest: Partial<Entry> = {}) => {
+    entries.push({ id: crypto.randomUUID(), date, description, amount, kind, category, source: 'manual', status: 'confirmed', accountId: 'conta', ...rest });
+  };
+
+  for (let index = -5; index <= 0; index++) {
+    const period = shiftMonth(month, index);
+    seed(dateInMonth(period, 5), 'Salário', 625000 + index * 7000, 'income', 'Salário');
+    seed(dateInMonth(period, 7), 'Aluguel', -188000, 'expense', 'Moradia');
+    seed(dateInMonth(period, 14), 'Mercado', -42180 - Math.abs(index * 3600), 'expense', 'Alimentação');
+    seed(dateInMonth(period, 9), 'Transporte', -17850 + index * 2500, 'expense', 'Transporte');
+    if (index < 0) seed(dateInMonth(period, 18), 'Outras despesas', -71000 + index * 5300, 'expense', 'Outros');
+  }
+  seed(dateInMonth(month, 13), 'Farmácia', -8750, 'expense', 'Saúde');
+  seed(dateInMonth(month, 12), 'Reserva do mês', -65000, 'saving', 'Economia');
+  seed(dateInMonth(month, 22), 'Energia elétrica', -16340, 'expense', 'Moradia', { status: 'planned' });
+  seed(dateInMonth(month, 24), 'Fone de ouvido', -9990, 'expense', 'Compras', {
+    source: 'installment', accountId: undefined, cardId: 'cartao', invoiceMonth: month,
+    installmentNumber: 2, installmentCount: 4, status: 'planned',
+  });
+
+  function items(period: string) {
+    const result = entries.filter((entry) => (entry.invoiceMonth ?? entry.date.slice(0, 7)) === period);
+    for (const rule of recurrences) {
+      if (period < rule.startMonth || (rule.endMonth && period > rule.endMonth)) continue;
+      if (result.some((entry) => entry.recurrenceId === rule.id)) continue;
+      result.push({
+        id: `previsto:${rule.id}:${period}`, date: dateInMonth(period, rule.day), description: rule.description,
+        recurrenceId: rule.id, category: rule.category, amount: rule.amount, kind: rule.kind, status: 'planned', source: 'recurrence',
+      });
+    }
+    return result.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }
+
+  function invoices(period: string): Invoice[] {
+    return cards.map((card) => ({
+      cardId: card.id,
+      month: period,
+      dueDate: dateInMonth(period, card.dueDay),
+      total: items(period).filter((entry) => entry.cardId === card.id).reduce((sum, entry) => sum - entry.amount, 0),
+      paid: allocations.filter((item) => item.cardId === card.id && item.month === period).reduce((sum, item) => sum + item.amount, 0),
+    })).filter((invoice) => invoice.total !== 0 || invoice.paid !== 0);
+  }
+
+  function monthly(period: string) {
+    const all = items(period);
+    const confirmed = all.filter((entry) => entry.status === 'confirmed');
+    const income = all.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + entry.amount, 0);
+    const expenses = confirmed.filter(isExpense).reduce((sum, entry) => sum - entry.amount, 0);
+    return { all, confirmed, income, expenses };
+  }
+
+  return {
+    async session() { return { email: 'demo@example.test' }; },
+    onSessionChange() { return () => {}; },
+    async signIn() {},
+    async signOut() {
+      if (profile.avatarUrl) URL.revokeObjectURL(profile.avatarUrl);
+    },
+    async dashboard(period): Promise<Dashboard> {
+      const { all, confirmed, income, expenses } = monthly(period);
+      const cash = confirmed.filter((entry) => !entry.cardId);
+      const upcoming = all.filter((entry) => entry.status === 'planned').sort((a, b) => a.date.localeCompare(b.date));
+      const categoryTotals = new Map<string, number>();
+      for (const entry of confirmed.filter(isExpense)) {
+        categoryTotals.set(entry.category, (categoryTotals.get(entry.category) ?? 0) - entry.amount);
+      }
+      const monthInvoices = invoices(period);
+      return {
+        month: period,
+        profile: { ...profile },
+        received: confirmed.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + entry.amount, 0),
+        expectedIncome: income,
+        expenses,
+        toPay: upcoming.filter((entry) => !entry.cardId && entry.kind === 'expense').reduce((sum, entry) => sum - entry.amount, 0)
+          + monthInvoices.reduce((sum, invoice) => sum + Math.max(0, invoice.total - invoice.paid), 0),
+        projectedSurplus: income + all.filter(isExpense).reduce((sum, entry) => sum + entry.amount, 0),
+        goal: goals.get(period) ?? 0,
+        saved: confirmed.filter((entry) => entry.kind === 'saving').reduce((sum, entry) => sum - entry.amount, 0),
+        cashIn: cash.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0),
+        cashOut: cash.reduce((sum, entry) => sum + Math.max(0, -entry.amount), 0),
+        invested: investments.reduce((total, investment) => total + investment.value, 0),
+        recent: confirmed.slice(0, 6),
+        upcoming: upcoming.slice(0, 12),
+        trend: Array.from({ length: 6 }, (_, i) => {
+          const previous = shiftMonth(period, i - 5);
+          const summary = monthly(previous);
+          const received = summary.confirmed.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + entry.amount, 0);
+          return { month: previous, income: received, expenses: summary.expenses };
+        }),
+        categories: Array.from(categoryTotals, ([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+        accounts: [...accounts], cards: [...cards], investments: [...investments], recurrences: [...recurrences],
+        invoices: monthInvoices, coverage: coverage.filter((item) => item.month === period),
+      };
+    },
+    async history(period, offset, limit) {
+      return items(period).slice(offset, offset + limit).map((entry) => ({
+        ...entry,
+        allocatedAmount: allocations.filter((item) => item.paymentId === entry.id).reduce((sum, item) => sum + item.amount, 0),
+      }));
+    },
+    async mutate(action) {
+      switch (action.type) {
+        case 'saveEntry': {
+          const current = entries.find((entry) => entry.id === action.entry.id);
+          if (current && allocations.some((item) => item.paymentId === current.id) &&
+            (action.entry.amount !== current.amount || action.entry.kind !== 'card_payment')) {
+            throw new Error('O pagamento já está vinculado a uma fatura.');
+          }
+          const id = current?.id ?? crypto.randomUUID();
+          put(entries, { ...action.entry, id, source: current?.source ?? (action.entry.recurrenceId ? 'recurrence' : 'manual') });
+          return;
+        }
+        case 'deleteEntry':
+          if (allocations.some((item) => item.paymentId === action.id)) throw new Error('O pagamento está vinculado a uma fatura.');
+          remove(entries, action.id);
+          return;
+        case 'saveAccount':
+          put(accounts, { ...action.account, id: action.account.id ?? crypto.randomUUID() });
+          return;
+        case 'saveCard':
+          put(cards, { ...action.card, id: action.card.id ?? crypto.randomUUID() });
+          return;
+        case 'saveInvestment':
+          put(investments, { ...action.investment, id: action.investment.id ?? crypto.randomUUID() });
+          return;
+        case 'deleteInvestment':
+          remove(investments, action.id);
+          return;
+        case 'saveRecurrence': {
+          const previous = recurrences.find((item) => item.id === action.recurrence.id);
+          if (previous && action.effectiveMonth && action.effectiveMonth > previous.startMonth) {
+            previous.endMonth = shiftMonth(action.effectiveMonth, -1);
+            put(recurrences, { ...action.recurrence, id: crypto.randomUUID(), startMonth: action.effectiveMonth });
+          } else {
+            put(recurrences, { ...action.recurrence, id: action.recurrence.id ?? crypto.randomUUID() });
+          }
+          return;
+        }
+        case 'endRecurrence': {
+          const rule = recurrences.find((item) => item.id === action.id);
+          if (rule) rule.endMonth = action.endMonth;
+          return;
+        }
+        case 'saveGoal':
+          goals.set(action.month, action.amount);
+          return;
+        case 'addInstallments': {
+          const card = cards.find((item) => item.id === action.cardId);
+          if (!card) throw new Error('Escolha um cartão.');
+          const base = Math.floor(action.total / action.count);
+          const remainder = action.total % action.count;
+          for (let index = 0; index < action.count; index++) {
+            const period = shiftMonth(action.firstMonth, index);
+            seed(dateInMonth(period, card.dueDay), action.description, -(base + Number(index < remainder)), 'expense', action.category, {
+              source: 'installment', invoiceMonth: period, accountId: undefined, cardId: card.id,
+              installmentNumber: index + 1, installmentCount: action.count, status: 'planned',
+            });
+          }
+          return;
+        }
+        case 'settleInvoice': {
+          const payment = entries.find((entry) => entry.id === action.paymentId && entry.kind === 'card_payment');
+          const invoice = invoices(action.month).find((item) => item.cardId === action.cardId);
+          const paid = allocations.filter((item) => item.paymentId === action.paymentId).reduce((sum, item) => sum + item.amount, 0);
+          if (!payment || !invoice || action.amount <= 0 || action.amount > Math.min(-payment.amount - paid, invoice.total - invoice.paid)) {
+            throw new Error('Informe um valor disponível no pagamento e na fatura.');
+          }
+          allocations.push(action);
+        }
+      }
+    },
+    async confirmImport(payload) {
+      const scope = payload.accountId ?? `${payload.cardId}:${payload.month}`;
+      const hash = `${payload.type}:${scope}:${payload.fileHash}`;
+      let inserted = 0;
+      let linked = 0;
+      let skipped = 0;
+      if (imported.has(hash)) return { inserted, linked, skipped: payload.rows.length };
+      const card = cards.find((item) => item.id === payload.cardId);
+      if (payload.type === 'invoice' && (!card || !payload.month)) throw new Error('Escolha um cartão e o mês da fatura.');
+      for (const row of payload.rows) {
+        const external = row.externalId ? `${scope}:${row.externalId}` : undefined;
+        if (external && externalIds.has(external)) {
+          skipped++;
+          continue;
+        }
+        const match = row.matchId && entries.find((entry) => entry.id === row.matchId);
+        if (match && match.amount === row.amount && match.cardId === card?.id && match.invoiceMonth === payload.month && match.source !== 'invoice') {
+          match.status = 'confirmed';
+          match.source = 'invoice';
+          linked++;
+        } else {
+          const date = card && payload.month ? dateInMonth(payload.month, card.dueDay) : row.date;
+          seed(date, row.description, row.amount, row.kind, row.category, {
+            source: payload.type, accountId: payload.accountId, cardId: payload.cardId,
+            invoiceMonth: payload.month, installmentNumber: row.installmentNumber, installmentCount: row.installmentCount,
+          });
+          inserted++;
+        }
+        if (external) externalIds.add(external);
+      }
+      if (payload.type === 'statement' && payload.from && payload.to) {
+        for (let period = payload.from.slice(0, 7); period <= payload.to.slice(0, 7); period = shiftMonth(period, 1)) {
+          coverage.push({
+            month: period,
+            from: period === payload.from.slice(0, 7) ? payload.from : dateInMonth(period, 1),
+            to: period === payload.to.slice(0, 7) ? payload.to : dateInMonth(period, 31),
+          });
+        }
+      }
+      imported.add(hash);
+      return { inserted, linked, skipped };
+    },
+    async saveProfile(name, avatar) {
+      profile.name = name.trim();
+      if (avatar === undefined) return;
+      if (profile.avatarUrl) URL.revokeObjectURL(profile.avatarUrl);
+      profile.avatarUrl = avatar ? URL.createObjectURL(avatar) : undefined;
+    },
+    async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
+  };
+}
+
+function isExpense(entry: Entry) {
+  return entry.kind === 'expense' || entry.kind === 'refund';
+}
+
+function put<T extends { id: string }>(list: T[], value: T) {
+  const index = list.findIndex((item) => item.id === value.id);
+  if (index < 0) list.push(value);
+  else list[index] = value;
+}
+
+function remove<T extends { id: string }>(list: T[], id: string) {
+  const index = list.findIndex((item) => item.id === id);
+  if (index >= 0) list.splice(index, 1);
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.cloudflare/
+.wrangler/
+.env*
+!.env.example
+.npm-cache/
+.playwright/
+test-results/
+*.log
+*.ofx
+*.qfx
+*.csv
+!tests/fixtures/*.csv

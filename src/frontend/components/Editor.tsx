@@ -31,7 +31,7 @@ export default function Editor({
   mutate,
   changeModal,
 }: {
-  modal: Exclude<EditModal, { type: "commitment" }>;
+  modal: Exclude<EditModal, { type: "commitment" | "card-picker" }>;
   data: Dashboard;
   month: string;
   busy: boolean;
@@ -56,7 +56,9 @@ export default function Editor({
     type === "entry" ? (modal.item?.kind ?? modal.kind ?? "expense") : "expense",
   );
   const currentBank = type === "card" ? data.accounts.find(({ id }) => id === item?.accountId)?.name : undefined;
-  const [linkedCard, setLinkedCard] = useState(!item || Boolean(currentBank));
+  const [linkedCard, setLinkedCard] = useState(
+    type === "card" && (item ? Boolean(currentBank) : !modal.standalone),
+  );
   const [bankName, setBankName] = useState(currentBank ?? "");
   const [cardName, setCardName] = useState(type === "card" && item?.name !== currentBank ? (item?.name ?? "") : "");
   const bankOptionsId = useId();
@@ -118,7 +120,7 @@ export default function Editor({
     contribution: "Registrar aporte",
     investment: item ? "Editar investimento" : "Novo investimento",
     recurrence: item ? "Editar recorrência" : "Nova recorrência",
-    card: item ? "Editar cartão" : "Novo cartão",
+    card: item ? "Editar cartão" : linkedCard ? "Cartão de outro banco" : "Cartão avulso",
     settle: "Conciliar fatura",
   };
   const amount = (n: number | undefined) => (n == null ? undefined : Math.abs(n));
@@ -431,7 +433,7 @@ export default function Editor({
           )}
           {type === "card" && (
             <>
-              <div className="segmented card-link-mode full" role="group" aria-label="Vínculo do cartão">
+              {item && <div className="segmented card-link-mode full" role="group" aria-label="Vínculo do cartão">
                 <button type="button" aria-pressed={linkedCard} onClick={() => setLinkedCard(true)}>Com banco</button>
                 <button
                   type="button"
@@ -443,7 +445,7 @@ export default function Editor({
                 >
                   Avulso
                 </button>
-              </div>
+              </div>}
               {linkedCard ? (
                 <div className="card-bank-field full">
                   <Field
@@ -473,23 +475,7 @@ export default function Editor({
                   full
                 />
               )}
-              {linkedCard && data.accounts.length > 0 && (
-                <div className="bank-choices full" role="group" aria-label="Bancos cadastrados">
-                  {data.accounts.map(({ id, name }) => (
-                    <button
-                      className="bank-choice"
-                      key={id}
-                      type="button"
-                      aria-pressed={bankName === name}
-                      onClick={() => setBankName(name)}
-                    >
-                      <BankIcon bank={name} />
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <details className="form-details full">
+              {item && <details className="form-details full">
                 <summary>{linkedCard ? "Nome e vencimento (opcionais)" : "Vencimento (opcional)"}</summary>
                 <div className="form-grid">
                   {linkedCard && (
@@ -512,7 +498,7 @@ export default function Editor({
                     full
                   />
                 </div>
-              </details>
+              </details>}
             </>
           )}
           {type === "recurrence" && (

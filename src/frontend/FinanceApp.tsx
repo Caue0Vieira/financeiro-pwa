@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Action, Dashboard as DashboardData } from "../contracts";
+import CardPicker from "./components/CardPicker";
 import CommitmentEditor from "./components/CommitmentEditor";
 import Editor from "./components/Editor";
 import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./components/common";
@@ -107,7 +108,7 @@ export default function FinanceApp({
       return;
     }
     setModal(undefined);
-    showNotice(savedMonth ? "Compromisso salvo." : "Alterações salvas.");
+    showNotice(savedMonth ? "Compromisso salvo." : action.type === "saveCard" && !action.card.id ? "Cartão cadastrado." : "Alterações salvas.");
     try {
       if (savedMonth && savedMonth !== month) onMonth(savedMonth);
       else await commands.refresh();
@@ -248,7 +249,16 @@ export default function FinanceApp({
         </BackNavigation.Provider>
       </main>
       <MobileNav page={page} navigate={navigate} />
-      {modal?.type === "commitment" ? (
+      {modal?.type === "card-picker" ? (
+        <CardPicker
+          accounts={data.accounts}
+          busy={busy}
+          error={editorError}
+          close={() => { if (!busy) setModal(undefined); }}
+          openEditor={openEditor}
+          save={mutate}
+        />
+      ) : modal?.type === "commitment" ? (
         <CommitmentEditor
           cards={data.cards}
           month={month}

@@ -119,26 +119,37 @@ input::placeholder { color: var(--muted); }
 .card-link-mode > button { flex: 1; }
 .card-bank-field { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 8px; align-items: end; }
 .card-bank-field > .transaction-icon { width: 46px; height: 46px; }
-.bank-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.bank-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-block: 12px;
+}
 .bank-choice {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   max-width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   padding: 5px 9px 5px 5px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
   font-size: .84rem;
   font-weight: 680;
+  text-align: start;
   overflow-wrap: anywhere;
 }
 .bank-choice .transaction-icon { width: 30px; height: 30px; border-radius: 7px; }
-.bank-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.bank-choice > svg { color: var(--accent); }
+.bank-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
 @media (pointer: coarse) {
   .field input, .select-control { font-size: 1rem; }
 }
 @media (max-width: 355px) {
   .form-grid { grid-template-columns: 1fr; }
+  .bank-choice { grid-template-columns: auto minmax(0, 1fr); gap: 5px; padding-inline: 5px; }
+  .bank-choice .transaction-icon { width: 26px; height: 26px; }
+  .bank-choice > svg { display: none; }
 }

@@ -17,7 +17,7 @@ export default function Cards({
       <PageHeading
         title="Cartões"
         action={
-          <button className="button" onClick={() => openEditor({ type: "card" })}>
+          <button className="button" onClick={() => openEditor({ type: "card-picker" })}>
             <Icon name="plus" size={16} /> Adicionar cartão
           </button>
         }

@@ -19,7 +19,8 @@ export type EditModal =
   | { type: "settle"; item: Invoice }
   | { type: "target"; item?: SavingsTarget; name?: string }
   | { type: "contribution"; item: SavingsTarget }
-  | { type: "card"; item?: Card }
+  | { type: "card"; item?: Card; standalone?: boolean }
+  | { type: "card-picker" }
   | { type: "commitment" }
   | { type: "budget"; item?: never };
 

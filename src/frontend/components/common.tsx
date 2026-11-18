@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useRef,
   type ReactNode,
 } from "react";
@@ -160,6 +161,16 @@ export function HeaderMenu({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    function closeOutside(event: MouseEvent) {
+      const menu = ref.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    }
+
+    document.addEventListener("click", closeOutside, true);
+    return () => document.removeEventListener("click", closeOutside, true);
+  }, []);
+
   return (
     <details
       className="reference-header-menu"

@@ -138,7 +138,7 @@ export default function FinanceApp({
     ),
     activity: (
       <Activity
-        key={month + activityFilter}
+        key={activityFilter}
         data={data}
         history={commands.history}
         monthControl={monthControl}

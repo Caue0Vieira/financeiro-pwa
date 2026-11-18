@@ -44,8 +44,7 @@ export default function Activity({
   initialFilter: ActivityFilter;
   onImport: () => void;
 }) {
-  const [rows, setRows] = useState<Entry[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const [result, setResult] = useState<{ month: string; rows: Entry[]; hasMore: boolean }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<ActivityFilter>(initialFilter);
@@ -53,6 +52,9 @@ export default function Activity({
   const [query, setQuery] = useState("");
   const [retry, setRetry] = useState(0);
   const version = useRef(0);
+  const current = result?.month === data.month ? result : undefined;
+  const rows = current?.rows ?? [];
+  const loadingMonth = loading || (!current && !error);
 
   useEffect(() => {
     const request = ++version.current;
@@ -61,8 +63,7 @@ export default function Activity({
     void history(data.month, 0, batchSize)
       .then((entries) => {
         if (request !== version.current) return;
-        setRows(entries);
-        setHasMore(entries.length === batchSize);
+        setResult({ month: data.month, rows: entries, hasMore: entries.length === batchSize });
       })
       .catch(() => {
         if (request === version.current) setError("Não foi possível carregar as transações.");
@@ -82,8 +83,7 @@ export default function Activity({
     try {
       const entries = await history(data.month, rows.length, batchSize);
       if (request !== version.current) return;
-      setRows((previous) => [...previous, ...entries]);
-      setHasMore(entries.length === batchSize);
+      setResult({ month: data.month, rows: [...rows, ...entries], hasMore: entries.length === batchSize });
     } catch {
       if (request === version.current) setError("Não foi possível carregar mais transações.");
     } finally {
@@ -136,7 +136,7 @@ export default function Activity({
       <section
         className="panel activity-panel screen-list"
         aria-label="Histórico de transações"
-        aria-busy={loading}
+        aria-busy={loadingMonth}
       >
         <div className="activity-controls">
           <div className="segmented" role="group" aria-label="Tipo de transação">
@@ -165,7 +165,7 @@ export default function Activity({
             {error}
           </p>
         )}
-        {rows.length > 0 || (!loading && !error) ? (
+        {rows.length > 0 || (!loadingMonth && !error) ? (
           visible.length ? (
             [...groups]
               .sort(([a], [b]) => Number(a > today) - Number(b > today) || b.localeCompare(a))
@@ -191,18 +191,18 @@ export default function Activity({
             </p>
           )
         ) : null}
-        {loading && (
+        {loadingMonth && (
           <p className="empty" role="status">
             Carregando transações…
           </p>
         )}
-        {error && rows.length === 0 && !loading && (
+        {error && rows.length === 0 && !loadingMonth && (
           <button className="text-button load-more" onClick={() => setRetry(retry + 1)}>
             Tentar novamente
           </button>
         )}
-        {hasMore && (
-          <button className="text-button load-more" disabled={loading} onClick={() => void loadMore()}>
+        {current?.hasMore && (
+          <button className="text-button load-more" disabled={loadingMonth} onClick={() => void loadMore()}>
             Carregar mais
           </button>
         )}

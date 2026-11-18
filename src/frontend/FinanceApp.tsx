@@ -3,6 +3,7 @@ import type { Action, Dashboard as DashboardData } from "../contracts";
 import CardPicker from "./components/CardPicker";
 import CommitmentEditor from "./components/CommitmentEditor";
 import Editor from "./components/Editor";
+import InvoiceAlerts, { useInvoiceAlerts } from "./components/InvoiceAlerts";
 import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./components/common";
 import { account, MobileNav, Sidebar, workspace } from "./components/Navigation";
 import Activity, { type ActivityFilter } from "./pages/Activity";
@@ -54,6 +55,7 @@ export default function FinanceApp({
   const main = useRef<HTMLElement>(null);
   const moveFocus = useRef(false);
   const month = data.month;
+  const invoiceAlerts = useInvoiceAlerts(data, commands.dashboard);
 
   useEffect(() => {
     if (!moveFocus.current) return;
@@ -125,11 +127,22 @@ export default function FinanceApp({
   const add = () => openEditor({ type: "entry" });
   const activeCards = data.cards.filter((card) => !card.archived);
   const monthControl = <MonthControl month={month} onMonth={onMonth} />;
+  const invoiceReminders = (
+    <InvoiceAlerts
+      alerts={invoiceAlerts}
+      data={data}
+      onOpen={(invoiceMonth) => {
+        if (invoiceMonth !== month) onMonth(invoiceMonth);
+        navigate("commitments");
+      }}
+    />
+  );
   const pages: Record<Page, ReactNode> = {
     home: (
       <Dashboard
         data={data}
         monthControl={monthControl}
+        invoiceReminders={invoiceReminders}
         openEditor={openEditor}
         navigate={navigate}
         balanceVisible={balanceVisible}
@@ -173,6 +186,7 @@ export default function FinanceApp({
     profile: (
       <Profile
         data={data}
+        invoiceReminders={invoiceReminders}
         month={month}
         commands={commands}
         preview={preview}

@@ -33,6 +33,7 @@ function ProfileSection({
 
 export default function Profile({
   data,
+  invoiceReminders,
   month,
   commands,
   preview,
@@ -42,6 +43,7 @@ export default function Profile({
   navigate,
 }: {
   data: Dashboard;
+  invoiceReminders: ReactNode;
   month: string;
   commands: FinanceCommands;
   preview: boolean;
@@ -200,6 +202,7 @@ export default function Profile({
           </form>
         </ProfileSection>
         <ProfileSection title="Notificações" icon="bell">
+          {invoiceReminders}
           <p className="subtle">Próximos vencimentos neste mês</p>
           {data.upcoming.length ? (
             <ul className="profile-reminders">

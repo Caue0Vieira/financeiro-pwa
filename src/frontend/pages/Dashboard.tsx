@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 import type { Dashboard as DashboardData } from "../../contracts";
 import { Avatar, Entries, EntryRow, Icon, type IconName } from "../components/common";
 import { brandName } from "../brand";
-import { todayInSaoPaulo } from "../../date";
+import { addDays, todayInSaoPaulo } from "../../date";
 import { dateLabel, money } from "../format";
 import type { OpenEditor, Page } from "../types";
 
 export default function Dashboard({
   data,
   monthControl,
+  invoiceReminders,
   openEditor,
   navigate,
   balanceVisible,
@@ -16,6 +17,7 @@ export default function Dashboard({
 }: {
   data: DashboardData;
   monthControl: ReactNode;
+  invoiceReminders: ReactNode;
   openEditor: OpenEditor;
   navigate: (page: Page) => void;
   balanceVisible: boolean;
@@ -39,7 +41,7 @@ export default function Dashboard({
   ];
   const confirmedBalance = data.received - data.expenses;
   const today = todayInSaoPaulo();
-  const yesterday = new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
+  const yesterday = addDays(today, -1);
 
   return (
     <>
@@ -103,6 +105,7 @@ export default function Dashboard({
               </button>
             ))}
           </div>
+          {invoiceReminders}
           <section className="panel recent-panel screen-list">
             <header className="panel-head">
               <h2>Transações recentes</h2>

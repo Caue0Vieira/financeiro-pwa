@@ -8,6 +8,12 @@ const saoPaulo = new Intl.DateTimeFormat('sv-SE', {
 export const todayInSaoPaulo = () => saoPaulo.format(new Date());
 export const currentMonth = () => todayInSaoPaulo().slice(0, 7);
 
+export function addDays(date: string, days: number) {
+  const day = new Date(date + 'T00:00:00Z');
+  day.setUTCDate(day.getUTCDate() + days);
+  return day.toISOString().slice(0, 10);
+}
+
 export function shiftMonth(month: string, difference: number) {
   const [year, index] = month.split('-').map(Number);
   return new Date(Date.UTC(year, index - 1 + difference, 1)).toISOString().slice(0, 7);

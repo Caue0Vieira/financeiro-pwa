@@ -1,8 +1,5 @@
 import type { AnalysisPeriod, SpendingAnalysis } from '../contracts.ts';
-import { shiftMonth } from '../date.ts';
-
-export const addDays = (date: string, days: number) =>
-  new Date(Date.parse(date + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
+import { addDays, shiftMonth } from '../date.ts';
 
 export function spendingWindow(date: string, period: AnalysisPeriod) {
   const month = date.slice(0, 7);

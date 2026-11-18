@@ -1,6 +1,6 @@
 import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
-import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date.ts';
-import { addDays, spendingWindow, summarizeSpending } from './spending.ts';
+import { addDays, currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date.ts';
+import { spendingWindow, summarizeSpending } from './spending.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();

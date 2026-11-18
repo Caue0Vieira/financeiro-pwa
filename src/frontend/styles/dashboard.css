@@ -149,6 +149,16 @@
 .home-summary dd { margin: 0; font-weight: 730; font-variant-numeric: tabular-nums; }
 .home-summary .text-button { margin-left: -9px; }
 .home-aside .upcoming-panel { margin-bottom: 0; }
+.invoice-alerts {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--accent-soft);
+}
+.invoice-alerts .panel-head { margin-bottom: 4px; }
+.invoice-alerts .panel-head h2 { font-size: 1rem; }
+.invoice-alerts .card-row { padding-inline: 0; }
+.invoice-alerts .card-row:hover { background: var(--surface); }
 
 @media (hover: hover) and (pointer: fine) {
   .transaction.home-entry-row:hover, .home-quick-actions button:hover { background: var(--home-action-mint); }

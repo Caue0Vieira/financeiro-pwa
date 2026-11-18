@@ -479,20 +479,10 @@ export default function Editor({
                   full
                 />
               )}
-              {item && <details className="form-details full">
-                <summary>{linkedCard ? "Nome e vencimento (opcionais)" : "Vencimento (opcional)"}</summary>
-                <div className="form-grid">
-                  {linkedCard && (
-                    <Field
-                      label="Nome do cartão"
-                      value={cardName}
-                      onChange={(event) => setCardName(event.target.value)}
-                      placeholder="Ex.: Cartão principal"
-                      full
-                    />
-                  )}
+              {item && (
+                <>
                   <Field
-                    label="Dia do vencimento"
+                    label="Dia do vencimento da fatura"
                     name="dueDay"
                     type="number"
                     min="1"
@@ -501,8 +491,20 @@ export default function Editor({
                     placeholder="Ex.: 10"
                     full
                   />
-                </div>
-              </details>}
+                  {linkedCard && (
+                    <details className="form-details full">
+                      <summary>Nome do cartão (opcional)</summary>
+                      <Field
+                        label="Nome do cartão"
+                        value={cardName}
+                        onChange={(event) => setCardName(event.target.value)}
+                        placeholder="Ex.: Cartão principal"
+                        full
+                      />
+                    </details>
+                  )}
+                </>
+              )}
             </>
           )}
           {type === "recurrence" && (

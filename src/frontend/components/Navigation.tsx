@@ -71,60 +71,43 @@ const mobileLinks = [
   { id: "profile", label: "Perfil", icon: "user" },
 ] as const;
 
+/** Floating Liquid Glass tab bar (phones). A glass lens slides to the active tab. */
 export function MobileNav({
   page,
   navigate,
   onAdd,
 }: NavigationProps & { onAdd: () => void }) {
-  const activeCol =
-    page === "home"
-      ? 0
-      : page === "analytics"
-        ? 1
-        : page === "goals"
-          ? 3
-          : page === "profile"
-            ? 4
-            : -1;
-
   const render = ({ id, label, icon }: (typeof mobileLinks)[number]) => {
     const isActive = page === id;
     return (
       <button
         key={id}
-        className={isActive ? "active" : undefined}
+        type="button"
+        className="tabbar-item"
         aria-current={isActive ? "page" : undefined}
         onClick={() => navigate(id)}
       >
-        <Icon name={icon} size={19} />
+        {isActive && (
+          <motion.span className="tabbar-lens" layoutId="tabbar-lens" transition={iosSpring} aria-hidden="true" />
+        )}
+        <Icon name={icon} size={22} />
         <span>{label}</span>
       </button>
     );
   };
 
   return (
-    <nav className="mobile-nav" aria-label="Navegação principal">
+    <nav className="tabbar" data-page={page} aria-label="Navegação principal">
       {render(mobileLinks[0])}
       {render(mobileLinks[1])}
-      <button
-        type="button"
-        className="mobile-add"
-        onClick={onAdd}
-        aria-label="Novo lançamento"
-      >
-        <Icon name="plus" size={24} />
+      <button type="button" className="tabbar-item tabbar-add" onClick={onAdd} aria-label="Novo lançamento">
+        <span className="tabbar-add-orb" aria-hidden="true">
+          <Icon name="plus" size={20} />
+        </span>
+        <span aria-hidden="true">Novo</span>
       </button>
       {render(mobileLinks[2])}
       {render(mobileLinks[3])}
-      {activeCol !== -1 && (
-        <span
-          className="mobile-nav-indicator"
-          aria-hidden="true"
-          style={{
-            transform: `translateX(calc(${activeCol} * (100% + var(--mobile-nav-gap))))`,
-          }}
-        />
-      )}
     </nav>
   );
 }

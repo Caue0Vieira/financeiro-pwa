@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
-import { dateInMonth, todayInSaoPaulo } from "../date";
+import { invoiceDates, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import type {
   FinanceService,
@@ -213,13 +213,11 @@ export function createSupabaseService(
           await upsert("accounts", { ...action.account });
           break;
         case "saveCard": {
-          const { id, name, bank, dueDay } = action.card;
-          const { error } = await db.rpc("save_card", {
-            p_id: id ?? null,
-            p_name: name,
-            p_bank: bank ?? null,
-            p_due_day: dueDay,
-          });
+          const { id, name, bank, dueDay, closingDay } = action.card;
+          const card = { p_id: id ?? null, p_name: name, p_bank: bank ?? null, p_due_day: dueDay };
+          let { error } = await db.rpc("save_card", { ...card, p_closing_day: closingDay });
+          // PGRST202: the invoice_dates migration (closing day) is not applied yet.
+          if (error?.code === "PGRST202") ({ error } = await db.rpc("save_card", card));
           fail(error);
           break;
         }
@@ -314,6 +312,22 @@ export function createSupabaseService(
           fail(error);
           break;
         }
+        case "saveInvoiceDates": {
+          const { cardId, month, closingDate, dueDate } = action;
+          if (!closingDate && !dueDate) {
+            const { error } = await db.from("card_invoice_dates").delete()
+              .eq("card_id", cardId).eq("month", first(month));
+            fail(error);
+            break;
+          }
+          const u = await user();
+          const { error } = await db.from("card_invoice_dates").upsert(
+            { user_id: u.id, card_id: cardId, month: first(month), closing_on: closingDate, due_on: dueDate },
+            { onConflict: "user_id,card_id,month" },
+          );
+          fail(error);
+          break;
+        }
         case "settleInvoice": {
           const { error } = await db.rpc("settle_invoice", {
             p_payment_id: action.paymentId,
@@ -336,12 +350,17 @@ export function createSupabaseService(
       return summarizeSpending(rows, window, period);
     },
     async dashboard(month): Promise<Dashboard> {
-      const [{ data, error }, planning] = await Promise.all([
+      const [{ data, error }, planning, adjustedDates] = await Promise.all([
         db.rpc("monthly_dashboard", { p_month: first(month) }),
         db.rpc("nitido_planning", { p_month: first(month) }),
+        db.from("card_invoice_dates").select("card_id, closing_on, due_on").eq("month", first(month)),
       ]);
       fail(error);
       fail(planning.error);
+      // Until the card_invoice_dates migration is applied, fall back to the cards' usual days.
+      const dateOverrides = (adjustedDates.error ? [] : adjustedDates.data) as {
+        card_id: string; closing_on: string | null; due_on: string | null;
+      }[];
       const { budget, targets, valuations } = planning.data as {
         budget: number; targets: SavingsTarget[]; valuations: Valuation[];
       };
@@ -444,10 +463,14 @@ export function createSupabaseService(
               .filter((p: any) => p.invoice_id === i.id)
               .reduce((a: number, p: any) => a + Number(p.amount_cents), 0)
           : 0;
+        const override = dateOverrides.find((x) => x.card_id === c.id);
         return {
           cardId: c.id,
           month,
-          dueDate: c.due_day == null ? null : dateInMonth(month, c.due_day),
+          ...invoiceDates(month, c.closing_day ?? null, c.due_day ?? null, {
+            closingDate: override?.closing_on,
+            dueDate: override?.due_on,
+          }),
           total,
           paid,
         };
@@ -502,6 +525,7 @@ export function createSupabaseService(
           id: x.id,
           name: x.name,
           dueDay: x.due_day,
+          closingDay: x.closing_day ?? null,
           accountId: x.account_id ?? undefined,
           archived: x.archived === true,
         })),

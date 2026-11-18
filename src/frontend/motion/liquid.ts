@@ -74,7 +74,7 @@ export function useEntrance(root: RefObject<HTMLElement | null>) {
           .from(q(".sidebar .nav button"), { autoAlpha: 0, x: -10, stagger: 0.035, duration: 0.6, ease: "power3.out" }, "<0.12")
           .from(q(".topbar"), { autoAlpha: 0, y: -12, ease: "power3.out" }, 0.12)
           .from(content, { autoAlpha: 0, y: 18, stagger: 0.07 }, 0.2)
-          .from(q(".mobile-nav"), { autoAlpha: 0, y: 24 }, 0.3);
+          .from(q(".tabbar"), { autoAlpha: 0, y: 24 }, 0.3);
       });
       return () => mm.revert();
     },

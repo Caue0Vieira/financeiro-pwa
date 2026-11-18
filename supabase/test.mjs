@@ -111,6 +111,14 @@ assert.deepEqual(planning.targets,[{id:goal,name:'Viagem',amount:90000,saved:250
 assert.deepEqual(planning.valuations,[{date:'2026-01-10',value:200000},{date:'2026-01-20',value:212000}]);
 const expenseDays=(await db.query("select public.nitido_expense_days('2026-01-01','2026-02-01') as value")).rows[0].value;
 assert.ok(expenseDays.some(row=>row.category==='Casa' && row.amount>0));
+await db.query("select public.save_card($1,'Cartão adicional','Conta',15,8)", [linkedCards[1].id]);
+assert.deepEqual(
+  (await db.query("select due_day, closing_day from public.cards where id=$1", [linkedCards[1].id])).rows[0],
+  { due_day: 15, closing_day: 8 },
+);
+await db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-02-01','2026-02-06','2026-02-16')", [linkedCards[1].id]);
+await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-03-01','2026-03-20','2026-03-10')", [linkedCards[1].id]));
+await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month) values ($1,'2026-04-01')", [linkedCards[1].id]));
 await db.query("update public.cards set archived=true where id=$1", [card]);
 const archivedDashboard = (await db.query("select public.monthly_dashboard('2026-01-01') as value")).rows[0].value;
 assert.equal(archivedDashboard.cards.find(item => item.id === card)?.archived, true);
@@ -130,5 +138,7 @@ await assert.rejects(()=>db.query("select public.settle_invoice($1,$2,'2026-01-0
 await assert.rejects(() => db.query("select public.save_card($1,'Cartão de outro usuário','Conta',null)", [linkedCards[0].id]));
 await assert.rejects(() => db.query("insert into public.cards(name,account_id) values ('Banco de outro usuário',$1)", [account]));
 assert.deepEqual((await db.query("update public.cards set archived=true where id=$1 returning id", [dueCard])).rows, []);
+assert.equal((await db.query("select * from public.card_invoice_dates")).rows.length, 0);
+await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,due_on) values ($1,'2026-05-01','2026-05-10')", [linkedCards[1].id]));
 console.log('Migration, card links, owner isolation, installment, import, and settlement invariants passed.');
 await db.close();

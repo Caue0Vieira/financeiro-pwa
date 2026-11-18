@@ -21,7 +21,15 @@ export interface Entry {
 }
 
 export interface Account { id: string; name: string }
-export interface Card { id: string; name: string; dueDay: number | null; accountId?: string; archived?: boolean }
+export interface Card {
+  id: string;
+  name: string;
+  dueDay: number | null;
+  /** Day the invoice closes; repeats every month like dueDay. */
+  closingDay: number | null;
+  accountId?: string;
+  archived?: boolean;
+}
 export interface Investment {
   id: string;
   institution: string;
@@ -43,7 +51,10 @@ export interface Recurrence {
 export interface Invoice {
   cardId: string;
   month: string;
+  closingDate: string | null;
   dueDate: string | null;
+  /** True when this month's dates were edited and differ from the card's days. */
+  adjusted: boolean;
   total: number;
   paid: number;
 }
@@ -93,7 +104,7 @@ export type Action =
   | { type: 'saveEntry'; entry: Omit<Entry, 'id' | 'source'> & { id?: string } }
   | { type: 'deleteEntry'; id: string }
   | { type: 'saveAccount'; account: Omit<Account, 'id'> & { id?: string } }
-  | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay'> & { id?: string; bank?: string } }
+  | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay' | 'closingDay'> & { id?: string; bank?: string } }
   | { type: 'archiveCard'; id: string }
   | { type: 'saveInvestment'; investment: Omit<Investment, 'id'> & { id?: string } }
   | { type: 'deleteInvestment'; id: string }
@@ -105,7 +116,9 @@ export type Action =
   | { type: 'saveTarget'; target: Pick<SavingsTarget, 'name' | 'amount'> & { id?: string } }
   | { type: 'deleteTarget'; id: string }
   | { type: 'contributeTarget'; id: string; amount: number }
-  | { type: 'settleInvoice'; paymentId: string; cardId: string; month: string; amount: number };
+  | { type: 'settleInvoice'; paymentId: string; cardId: string; month: string; amount: number }
+  /** Both dates null restores the card's usual days for that month. */
+  | { type: 'saveInvoiceDates'; cardId: string; month: string; closingDate: string | null; dueDate: string | null };
 
 export interface ImportRow {
   date: string;

@@ -87,7 +87,8 @@
   .commitments-summary .month-switch { width: 100%; justify-content: space-between; }
 }
 .commitment-invoice + .commitment-invoice { border-top: 1px solid var(--line); }
-.commitment-invoice .text-button { margin-inline-start: auto; display: flex; }
+.commitment-invoice-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 14px; }
+.commitment-invoice .text-button { display: inline-flex; align-items: center; gap: 5px; }
 .commitments-recurring > summary {
   cursor: pointer;
   color: var(--accent);
@@ -368,14 +369,6 @@
   .topbar .top-actions { display: none; }
   .demo-label { font-size: .69rem; }
   .demo-label i { width: 6px; height: 6px; }
-  .mobile-nav {
-    inset: auto 0 0;
-    border-radius: 0;
-    padding: 5px 12px max(5px, env(safe-area-inset-bottom));
-    border: 0;
-    border-top: 1px solid var(--line);
-  }
-  .mobile-nav button:not(.mobile-add) { min-height: 56px; border-radius: 10px; font-size: .65rem; }
   .mobile-back { display: grid; margin-left: -8px; }
   .page-heading { margin-bottom: 12px; }
   .page-heading h1 { font-size: 1.53rem; }
@@ -404,8 +397,6 @@
   .budget-layout .category-list li { font-size: .74rem; }
 }
 @media (max-width: 355px) {
-  .mobile-nav { padding-inline: 8px; }
-  .mobile-nav button { padding-inline: 0; font-size: .625rem; }
   .main { padding-inline: 12px; }
   .spend-plot button { font-size: .655rem; }
 }

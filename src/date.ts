@@ -24,3 +24,20 @@ export function dateInMonth(month: string, day: number) {
   const last = new Date(Date.UTC(year, index, 0)).getUTCDate();
   return `${month}-${String(Math.min(day, last)).padStart(2, '0')}`;
 }
+
+/**
+ * Default dates of the invoice that is due in `month`. The invoice closes in the same
+ * month when the closing day comes before the due day (closes 3, due 10); otherwise it
+ * closed the month before (closes 28, due 5). Per-month overrides win over both days.
+ */
+export function invoiceDates(
+  month: string,
+  closingDay: number | null,
+  dueDay: number | null,
+  override?: { closingDate?: string | null; dueDate?: string | null },
+) {
+  const dueDate = override?.dueDate ?? (dueDay === null ? null : dateInMonth(month, dueDay));
+  const closingMonth = closingDay !== null && dueDay !== null && closingDay >= dueDay ? shiftMonth(month, -1) : month;
+  const closingDate = override?.closingDate ?? (closingDay === null ? null : dateInMonth(closingMonth, closingDay));
+  return { closingDate, dueDate, adjusted: Boolean(override?.closingDate || override?.dueDate) };
+}

@@ -35,7 +35,7 @@ export default function CardPicker({
             key={bank}
             type="button"
             disabled={busy}
-            onClick={() => void save({ type: "saveCard", card: { name: bank, bank, dueDay: null } })}
+            onClick={() => void save({ type: "saveCard", card: { name: bank, bank, dueDay: null, closingDay: null } })}
           >
             <BankIcon bank={bank} />
             <span>{bank}</span>

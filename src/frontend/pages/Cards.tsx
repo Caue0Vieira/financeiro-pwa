@@ -29,6 +29,7 @@ export default function Cards({
           const details = [
             bank && bank !== card.name && bank,
             !bank && "Avulso",
+            card.closingDay !== null && `Fecha dia ${card.closingDay}`,
             card.dueDay === null ? "Definir vencimento" : `Vence dia ${card.dueDay}`,
           ].filter(Boolean).join(" · ");
 

@@ -8,7 +8,7 @@ import type {
   Investment,
   Recurrence,
 } from "../../contracts";
-import { todayInSaoPaulo } from "../../date";
+import { addDays, invoiceDates, todayInSaoPaulo } from "../../date";
 import { Icon } from "./common";
 import { BankIcon, bankSuggestions } from "./BankIcon";
 import { Field } from "./Field";
@@ -125,7 +125,13 @@ export default function Editor({
     recurrence: item ? "Editar recorrência" : "Nova recorrência",
     card: item ? "Editar cartão" : linkedCard ? "Cartão de outro banco" : "Cartão avulso",
     settle: "Conciliar fatura",
+    "invoice-dates": "Datas da fatura",
   };
+  const invoiceCard = type === "invoice-dates" ? data.cards.find(({ id }) => id === item.cardId) : undefined;
+  const usualDates = type === "invoice-dates"
+    ? invoiceDates(item.month, invoiceCard?.closingDay ?? null, invoiceCard?.dueDay ?? null)
+    : undefined;
+  const [closingDate, setClosingDate] = useState(type === "invoice-dates" ? (item.closingDate ?? "") : "");
   const amount = (n: number | undefined) => (n == null ? undefined : Math.abs(n));
   const read = (f: FormData, k: string) => String(f.get(k) || "").trim();
   const cents = (f: FormData, k: string) => parseBrazilianAmount(read(f, k));
@@ -186,6 +192,7 @@ export default function Editor({
           name: cardName.trim() || bankName.trim(),
           bank: linkedCard ? bankName.trim() : undefined,
           dueDay: Number(read(f, "dueDay")) || null,
+          closingDay: Number(read(f, "closingDay")) || null,
         },
       });
     else if (type === "recurrence") {
@@ -212,6 +219,17 @@ export default function Editor({
         month: item.month,
         amount: cents(f, "amount"),
       });
+    else if (type === "invoice-dates") {
+      // Store only what differs from the card's usual days, so later changes to them still apply.
+      const differs = (value: string, usual: string | null | undefined) => (value && value !== usual ? value : null);
+      void mutate({
+        type: "saveInvoiceDates",
+        cardId: item.cardId,
+        month: item.month,
+        closingDate: differs(read(f, "closingDate"), usualDates?.closingDate),
+        dueDate: differs(read(f, "dueDate"), usualDates?.dueDate),
+      });
+    }
   };
   return (
     <Overlay title={titles[type]} onClose={close}>
@@ -505,15 +523,26 @@ export default function Editor({
               {item && (
                 <>
                   <Field
-                    label="Dia do vencimento da fatura"
+                    label="Dia que a fatura fecha"
+                    name="closingDay"
+                    type="number"
+                    min="1"
+                    max="31"
+                    defaultValue={item?.closingDay ?? undefined}
+                    placeholder="Ex.: 3"
+                  />
+                  <Field
+                    label="Dia que a fatura vence"
                     name="dueDay"
                     type="number"
                     min="1"
                     max="31"
                     defaultValue={item?.dueDay ?? undefined}
                     placeholder="Ex.: 10"
-                    full
                   />
+                  <p className="form-hint full">
+                    Esses dias se repetem todo mês. Para mudar só um mês, use Compromissos → Faturas do mês.
+                  </p>
                   {linkedCard && (
                     <details className="form-details full">
                       <summary>Nome do cartão (opcional)</summary>
@@ -649,6 +678,39 @@ export default function Editor({
               />
             </>
           )}
+          {type === "invoice-dates" && (
+            <>
+              <p className="form-hint full">
+                Ajuste só a fatura de {monthName(item.month)} de {invoiceCard?.name || "este cartão"}. Os outros meses
+                continuam com os dias do cadastro do cartão.
+              </p>
+              <Field label="Fecha em">
+                <input
+                  type="date"
+                  name="closingDate"
+                  value={closingDate}
+                  onChange={(event) => setClosingDate(event.target.value)}
+                />
+              </Field>
+              <Field label="Vence em">
+                <input
+                  type="date"
+                  name="dueDate"
+                  defaultValue={item.dueDate ?? ""}
+                  min={closingDate ? addDays(closingDate, 1) : undefined}
+                />
+              </Field>
+              {usualDates && (usualDates.closingDate || usualDates.dueDate) && (
+                <p className="form-hint full">
+                  Padrão do cartão:{" "}
+                  {[
+                    usualDates.closingDate && `fecha ${dateLabel(usualDates.closingDate)}`,
+                    usualDates.dueDate && `vence ${dateLabel(usualDates.dueDate)}`,
+                  ].filter(Boolean).join(" e ")}.
+                </p>
+              )}
+            </>
+          )}
         </div>
         {error && (
           <p className="inline-error" role="alert">
@@ -669,6 +731,18 @@ export default function Editor({
               onClick={() => changeModal({ type: "contribution", item })}
             >
               <Icon name="plus" size={16} /> Registrar aporte
+            </button>
+          )}
+          {type === "invoice-dates" && item.adjusted && (
+            <button
+              type="button"
+              className="button secondary"
+              disabled={busy}
+              onClick={() =>
+                void mutate({ type: "saveInvoiceDates", cardId: item.cardId, month: item.month, closingDate: null, dueDate: null })
+              }
+            >
+              Voltar ao padrão do cartão
             </button>
           )}
           {removeAction && !remove && (

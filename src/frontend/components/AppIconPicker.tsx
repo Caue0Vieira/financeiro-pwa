@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { appIcons, iconPath, readAppIcon, saveAppIcon, type AppIconId } from "../theme/appIcon";
+import { appIcons, iconPath, saveAppIcon, useAppIcon } from "../theme/appIcon";
 
 export function AppIconPicker({ onChange }: { onChange?: (label: string) => void }) {
-  const [current, setCurrent] = useState<AppIconId>(readAppIcon);
+  const current = useAppIcon();
 
   return (
     <div className="app-icon-picker">
@@ -16,7 +15,6 @@ export function AppIconPicker({ onChange }: { onChange?: (label: string) => void
             className="app-icon-option"
             onClick={() => {
               if (icon.id === current) return;
-              setCurrent(icon.id);
               saveAppIcon(icon.id);
               onChange?.(icon.label);
             }}

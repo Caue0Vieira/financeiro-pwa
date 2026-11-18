@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 export const appIcons = [
   { id: "esmeralda", label: "Esmeralda" },
   { id: "safira", label: "Safira" },
@@ -11,16 +13,13 @@ export type AppIconId = (typeof appIcons)[number]["id"];
 
 const storageKey = "finance-app-icon";
 const defaultIcon: AppIconId = "esmeralda";
+const listeners = new Set<() => void>();
 
 function isAppIcon(value: unknown): value is AppIconId {
   return appIcons.some((icon) => icon.id === value);
 }
 
-export function iconPath(id: AppIconId, file = "icon-192.png") {
-  return id === defaultIcon ? `/icons/${file}?v=4` : `/icons/${id}/${file}?v=4`;
-}
-
-export function readAppIcon(): AppIconId {
+function readStoredIcon(): AppIconId {
   try {
     const stored = localStorage.getItem(storageKey);
     return isAppIcon(stored) ? stored : defaultIcon;
@@ -29,9 +28,23 @@ export function readAppIcon(): AppIconId {
   }
 }
 
-/** Points the favicon, the iOS home-screen icon and the install manifest at the chosen icon. */
+let current = readStoredIcon();
+
+export function iconPath(id: AppIconId, file = "icon-192.png") {
+  return id === defaultIcon ? `/icons/${file}?v=4` : `/icons/${id}/${file}?v=4`;
+}
+
+export function readAppIcon(): AppIconId {
+  return current;
+}
+
+/**
+ * Points the favicon, the iOS home-screen icon and the install manifest at the chosen icon,
+ * and sets data-accent so the glass gradients follow its colour (see accents.css).
+ */
 export function applyAppIcon(id: AppIconId) {
   const head = document.head;
+  document.documentElement.dataset.accent = id;
   head.querySelector('link[rel="icon"]')?.setAttribute("href", iconPath(id));
   head.querySelector('link[rel="apple-touch-icon"]')?.setAttribute("href", iconPath(id, "apple-touch-icon.png"));
   head
@@ -45,5 +58,16 @@ export function saveAppIcon(id: AppIconId) {
   } catch {
     // Without storage the choice still applies to this visit.
   }
+  current = id;
   applyAppIcon(id);
+  listeners.forEach((notify) => notify());
+}
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
+}
+
+export function useAppIcon() {
+  return useSyncExternalStore(subscribe, readAppIcon);
 }

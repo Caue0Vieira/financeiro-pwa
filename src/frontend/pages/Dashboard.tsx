@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Dashboard as DashboardData } from "../../contracts";
 import { Avatar, Entries, EntryRow, Icon, type IconName } from "../components/common";
-import { brandName } from "../brand";
+import { HomeCardArt } from "../components/HomeCardArt";
 import { addDays, todayInSaoPaulo } from "../../date";
 import { dateLabel, money } from "../format";
 import type { OpenEditor, Page } from "../types";
@@ -87,13 +87,7 @@ export default function Dashboard({
                 </p>
               )}
             </div>
-            <div className="home-card-art" aria-hidden="true">
-              <span className="home-card-chip" />
-              <span className="home-card-signature">
-                <i />
-                <b>{brandName}</b>
-              </span>
-            </div>
+            <HomeCardArt data={data} />
           </section>
           <div className="home-quick-actions" aria-label="Ações rápidas">
             {actions.map(({ icon, label, action }) => (

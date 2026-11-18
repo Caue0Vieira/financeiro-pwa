@@ -16,6 +16,7 @@ export type EditModal =
   | { type: "investment"; item?: Investment }
   | { type: "recurrence"; item?: Recurrence }
   | { type: "settle"; item: Invoice }
+  | { type: "invoice-dates"; item: Invoice }
   | { type: "target"; item?: SavingsTarget; name?: string }
   | { type: "contribution"; item: SavingsTarget }
   | { type: "card"; item?: Card; standalone?: boolean }

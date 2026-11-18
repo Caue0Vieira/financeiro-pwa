@@ -23,6 +23,7 @@ import "./styles/screens.css";
 import "./styles/dashboard.css";
 import "./styles/reference.css";
 import "./styles/liquid-glass.css";
+import "./styles/tabbar.css";
 import { useEntrance, useSpotlight } from "./motion/liquid";
 
 type Props = {

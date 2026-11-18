@@ -1,0 +1,68 @@
+/* Accent palettes, one per app icon (html[data-accent], set by theme/appIcon.ts).
+   Liquid-glass tokens mix these into glows, gradients and highlights.
+   --mark-filter recolours the emerald brand mark exactly like the icon variants
+   were generated (same hue-rotate/saturate matrices). */
+:root,
+:root[data-accent="esmeralda"] {
+  --a-900: #03463a;
+  --a-700: #096a54;
+  --a-600: #0a8b62;
+  --a-500: #19b98a;
+  --a-300: #7fe8c4;
+  --a-200: #c9efe0;
+  --a-100: #e6f8f1;
+  --mark-filter: none;
+}
+:root[data-accent="safira"] {
+  --a-900: #0b2f5e;
+  --a-700: #1f5fb8;
+  --a-600: #2a73d6;
+  --a-500: #3b8cf0;
+  --a-300: #9cc8ff;
+  --a-200: #cfe2fb;
+  --a-100: #eaf2fd;
+  --mark-filter: hue-rotate(65deg);
+}
+:root[data-accent="ametista"] {
+  --a-900: #2e1a6b;
+  --a-700: #5b3fd6;
+  --a-600: #6d4aff;
+  --a-500: #8b6cff;
+  --a-300: #c2b2ff;
+  --a-200: #ddd3ff;
+  --a-100: #f0ebff;
+  --mark-filter: hue-rotate(115deg);
+}
+:root[data-accent="rubi"] {
+  --a-900: #5c0f22;
+  --a-700: #b4234a;
+  --a-600: #d23a5f;
+  --a-500: #f0587a;
+  --a-300: #ffadc0;
+  --a-200: #fbd3dd;
+  --a-100: #fdecf1;
+  --mark-filter: hue-rotate(195deg) saturate(1.05);
+}
+:root[data-accent="ambar"] {
+  --a-900: #5a3006;
+  --a-700: #a85a0c;
+  --a-600: #c9730f;
+  --a-500: #f09a1c;
+  --a-300: #ffd29b;
+  --a-200: #fbe3c2;
+  --a-100: #fdf3e4;
+  --mark-filter: hue-rotate(245deg) saturate(1.1);
+}
+:root[data-accent="grafite"] {
+  --a-900: #1d2329;
+  --a-700: #3f4a55;
+  --a-600: #56626e;
+  --a-500: #7d8a96;
+  --a-300: #c4ccd4;
+  --a-200: #dde2e7;
+  --a-100: #f0f2f4;
+  --mark-filter: saturate(0);
+}
+
+.brand img,
+.login-emblem img { filter: var(--mark-filter); }

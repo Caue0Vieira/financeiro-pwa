@@ -1,11 +1,16 @@
 import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
-import { addDays, currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date.ts';
+import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();
-  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }];
-  const cards: Card[] = [{ id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24 }];
+  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }, { id: 'nu', name: 'Nubank' }];
+  const cards: Card[] = [
+    { id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24, closingDay: 17 },
+    { id: 'roxinho', name: 'Nubank', accountId: 'nu', dueDay: 10, closingDay: 3 },
+  ];
+  /** Per-month invoice date adjustments, keyed by `${cardId}:${month}`. */
+  const invoiceDateOverrides = new Map<string, { closingDate: string | null; dueDate: string | null }>();
   const investments: Investment[] = [
     { id: 'acoes', institution: 'Corretora Pontal', name: 'Ações', contributed: 218025, value: 245060, updatedOn: todayInSaoPaulo() },
     { id: 'fundo', institution: 'Corretora Pontal', name: 'Fundos de investimento', contributed: 113197, value: 123045, updatedOn: todayInSaoPaulo() },
@@ -96,7 +101,7 @@ export function createDemoService(): FinanceService {
     return cards.map((card) => ({
       cardId: card.id,
       month: period,
-      dueDate: card.dueDay === null ? null : dateInMonth(period, card.dueDay),
+      ...invoiceDates(period, card.closingDay, card.dueDay, invoiceDateOverrides.get(`${card.id}:${period}`)),
       total: items(period).filter((entry) => entry.cardId === card.id).reduce((sum, entry) => sum - entry.amount, 0),
       paid: allocations.filter((item) => item.cardId === card.id && item.month === period).reduce((sum, item) => sum + item.amount, 0),
     })).filter((invoice) => invoice.total !== 0 || invoice.paid !== 0);
@@ -188,7 +193,7 @@ export function createDemoService(): FinanceService {
           put(accounts, { ...action.account, id: action.account.id ?? crypto.randomUUID() });
           return;
         case 'saveCard': {
-          const { id, name, dueDay } = action.card;
+          const { id, name, dueDay, closingDay } = action.card;
           const bank = action.card.bank?.trim();
           const previous = cards.find((card) => card.id === id);
           let account = bank ? accounts.find((item) =>
@@ -198,7 +203,7 @@ export function createDemoService(): FinanceService {
             account = { id: crypto.randomUUID(), name: bank };
             accounts.push(account);
           }
-          put(cards, { ...previous, id: id ?? crypto.randomUUID(), name, dueDay, accountId: account?.id });
+          put(cards, { ...previous, id: id ?? crypto.randomUUID(), name, dueDay, closingDay, accountId: account?.id });
           return;
         }
         case 'archiveCard': {
@@ -266,6 +271,15 @@ export function createDemoService(): FinanceService {
               installmentNumber: index + 1, installmentCount: action.count, status: 'planned',
             });
           }
+          return;
+        }
+        case 'saveInvoiceDates': {
+          const key = `${action.cardId}:${action.month.slice(0, 7)}`;
+          if (action.closingDate && action.dueDate && action.dueDate <= action.closingDate) {
+            throw new Error('O vencimento precisa ser depois do fechamento.');
+          }
+          if (!action.closingDate && !action.dueDate) invoiceDateOverrides.delete(key);
+          else invoiceDateOverrides.set(key, { closingDate: action.closingDate, dueDate: action.dueDate });
           return;
         }
         case 'settleInvoice': {

@@ -54,17 +54,29 @@ export default function Commitments({
                     <div className="transaction-info">
                       <strong>{card?.name || "Cartão"}</strong>
                       <span>
-                      {[card?.archived && "Cartão excluído", i.dueDate && `Vence ${dateLabel(i.dueDate)}`, i.paid > 0 && `Pago ${money(i.paid)}`]
-                          .filter(Boolean).join(" · ")}
+                      {[
+                        card?.archived && "Cartão excluído",
+                        i.closingDate && `Fecha ${dateLabel(i.closingDate)}`,
+                        i.dueDate && `Vence ${dateLabel(i.dueDate)}`,
+                        i.adjusted && "Datas ajustadas",
+                        i.paid > 0 && `Pago ${money(i.paid)}`,
+                      ].filter(Boolean).join(" · ")}
                       </span>
                     </div>
                     <span className="transaction-amount">{money(i.total)}</span>
                   </div>
-                  {i.total > i.paid && (
-                    <button className="text-button" onClick={() => setModal({ type: "settle", item: i })}>
-                      Vincular pagamento
-                    </button>
-                  )}
+                  <div className="commitment-invoice-actions">
+                    {!card?.archived && (
+                      <button className="text-button" onClick={() => setModal({ type: "invoice-dates", item: i })}>
+                        <Icon name="calendar" size={15} /> Editar datas
+                      </button>
+                    )}
+                    {i.total > i.paid && (
+                      <button className="text-button" onClick={() => setModal({ type: "settle", item: i })}>
+                        Vincular pagamento
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })

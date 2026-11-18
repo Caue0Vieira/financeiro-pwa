@@ -123,7 +123,6 @@
   .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .main {
     padding-inline: 19px;
   }
-  .app-shell:is([data-page="activity"],[data-page="investments"]) .mobile-nav { display: none; }
   .app-shell:is([data-page="activity"],[data-page="investments"]) .main {
     padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
@@ -146,14 +145,6 @@
     font-weight: 780;
     letter-spacing: -.02em;
   }
-  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav {
-    --mobile-nav-accent: var(--ref-green);
-    background: var(--page-paper);
-    box-shadow: none;
-    border-top-color: var(--ref-line);
-  }
-  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav button:not(.active):not(.mobile-add) { color: var(--page-muted); }
-  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav button:not(.mobile-add) svg { stroke-width: 1.9; }
 
   [data-page="analytics"] .period-tabs { background: var(--ref-track); border: 0; border-radius: 999px; padding: 0; margin-bottom: 24px; }
   [data-page="analytics"] .period-tabs button, [data-page="activity"] .segmented button, [data-page="investments"] .portfolio-tabs button {

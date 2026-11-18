@@ -1,15 +1,29 @@
-import type { CSSProperties } from "react";
 import type { Dashboard } from "../../contracts";
 import { brandName } from "../brand";
 import { cardDesign, findBank, type Bank, type CardDesign } from "./BankIcon";
 
-type FaceStyle = CSSProperties & Record<"--card-from" | "--card-to" | "--card-ink", string> & { "--card-detail"?: string };
-
 const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 
-/** CSS variables that paint a card face (see .home-card-art[data-bank] and .card-model). */
-export function faceStyle({ face: [from, to, ink, detail] }: CardDesign): FaceStyle {
-  return { "--card-from": from, "--card-to": to, "--card-ink": ink, ...(detail && { "--card-detail": detail }) };
+/** Printed details of a card model, drawn in CSS from a photo of the real card. */
+function CardPrint({ design }: { design: CardDesign }) {
+  switch (design.id) {
+    case "inter-prime":
+      return (
+        <>
+          <span className="ip-brand">
+            <span className="ip-mark">
+              <span className="ip-stripes"><i /><i /><i /><i /></span>
+              <b>inter</b>
+            </span>
+            <small>prime</small>
+          </span>
+          <span className="card-chip-metal" />
+          <span className="card-network"><i /><i /></span>
+        </>
+      );
+    default:
+      return null;
+  }
 }
 
 /** Radio group of mini cards to choose the model of a bank's card. */
@@ -22,7 +36,7 @@ export function CardModelPicker({
   value: string | null;
   onChange: (design: string) => void;
 }) {
-  const current = cardDesign(bank, value).id;
+  const current = cardDesign(bank, value)?.id;
   return (
     <div className="card-models" role="radiogroup" aria-label="Modelo do cartão">
       {bank.designs.map((design) => (
@@ -34,8 +48,8 @@ export function CardModelPicker({
           className="card-model"
           onClick={() => onChange(design.id)}
         >
-          <span className="card-model-face" data-detail={design.face[3] ? "" : undefined} style={faceStyle(design)}>
-            <img src={bank.image} alt="" />
+          <span className="card-model-face" data-art={design.id}>
+            <CardPrint design={design} />
           </span>
           <span>{design.label}</span>
         </button>
@@ -45,9 +59,9 @@ export function CardModelPicker({
 }
 
 /**
- * The card on the balance hero: the user's next card to come due, drawn as its bank's chosen
- * model with the bank logo, and up to two more cards stacked behind it.
- * Without cards it falls back to the app's own glass card.
+ * The card on the balance hero: the user's next card to come due and up to two more stacked
+ * behind it. A bank with a drawn model shows that card; other banks show the app's glass card
+ * with the bank logo. Without cards it falls back to the app's own glass card.
  */
 export function HomeCardArt({ data }: { data: Pick<Dashboard, "cards" | "accounts" | "invoices"> }) {
   const cards = data.cards
@@ -79,23 +93,20 @@ export function HomeCardArt({ data }: { data: Pick<Dashboard, "cards" | "account
         <span
           key={card.id}
           className="home-card-art home-card-back"
-          data-bank={design ? "" : undefined}
+          data-art={design?.id}
           data-depth={list.length - index}
-          style={design && faceStyle(design)}
           aria-hidden="true"
         />
       ))}
-      <div
-        className="home-card-art"
-        data-bank={front.design ? "" : undefined}
-        data-detail={front.design?.face[3] ? "" : undefined}
-        style={front.design && faceStyle(front.design)}
-        aria-hidden="true"
-      >
-        <span className="home-card-top">
-          <span className="home-card-chip" />
-          {front.bank && <img className="home-card-logo" src={front.bank.image} alt="" />}
-        </span>
+      <div className="home-card-art" data-art={front.design?.id} aria-hidden="true">
+        {front.design ? (
+          <CardPrint design={front.design} />
+        ) : (
+          <span className="home-card-top">
+            <span className="home-card-chip" />
+            {front.bank && <img className="home-card-logo" src={front.bank.image} alt="" />}
+          </span>
+        )}
         <span className="home-card-signature home-card-details">
           <b>{front.card.name}</b>
           {front.dueDate && <small>Vence {shortDate(front.dueDate)}</small>}

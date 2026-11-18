@@ -4,10 +4,9 @@ import { spendingWindow, summarizeSpending } from './spending.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();
-  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }, { id: 'nu', name: 'Nubank' }];
+  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }];
   const cards: Card[] = [
     { id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24, closingDay: 17 },
-    { id: 'roxinho', name: 'Nubank', accountId: 'nu', dueDay: 10, closingDay: 3 },
   ];
   /** Per-month invoice date adjustments, keyed by `${cardId}:${month}`. */
   const invoiceDateOverrides = new Map<string, { closingDate: string | null; dueDate: string | null }>();

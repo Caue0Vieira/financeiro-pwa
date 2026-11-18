@@ -76,7 +76,31 @@ export function classify(description: string, amount: number): Pick<ImportedTran
   const normalized = description.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/\b(pagamento|pagto|pgto|debito)\b.*\bfatura\b|\bfatura\b.*\b(pagamento|pagto|pgto|debito)\b/.test(normalized)) return { kind: 'invoice_payment', category: 'Pagamento de fatura' };
   if (/\b(pix|transferencia|ted|doc)\b/.test(normalized)) return { kind: 'review', category: 'Revisar' };
-  return amount >= 0 ? { kind: 'income', category: 'Outras receitas' } : { kind: 'expense', category: 'Outras despesas' };
+  if (amount >= 0) return { kind: 'income', category: 'Outras receitas' };
+
+  if (/\b(ifood|delivery|rappi|ze\s*delivery|aiqfome|restaurante|padaria|lanche|burger|pizza|mcdonald|subway|habib|outback|starbucks)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Alimentação' };
+  }
+  if (/\b(chatgpt|openai|gpt|claude|anthropic|gemini|netflix|spotify|prime\s*video|amazon\s*prime|youtube|disney|hbo|max|crunchyroll|deezer|apple\.com|apple\s*bill|google\s*play|google\s*storage|icloud)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Assinaturas' };
+  }
+  if (/\b(uber|99app|99pop|99\b|cabify|posto|gasolina|combustivel|estacionamento|pedagio|sem\s*parar|veloe|conectcar)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Transporte' };
+  }
+  if (/\b(mercado|supermercado|hipermercado|carrefour|pao\s*de\s*acucar|assai|atacad(ao)?|hortifruti|sacolao)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Mercado' };
+  }
+  if (/\b(farmacia|drogaria|droga\s*raia|drogasil|pague\s*menos|panvel|consulta|exame|laboratorio|dentista|medico)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Saúde' };
+  }
+  if (/\b(shopee|shein|aliexpress|amazon|mercado\s*livre|magalu|magazine\s*luiza|zara|renner|riachuelo)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Compras' };
+  }
+  if (/\b(enel|cpfl|light|sabesp|copasa|sanepar|comgas|claro|vivo|tim|oi|internet|aluguel|condominio)\b/.test(normalized)) {
+    return { kind: 'expense', category: 'Moradia' };
+  }
+
+  return { kind: 'expense', category: 'Outras despesas' };
 }
 
 function coverage(transactions: Array<Pick<ImportedTransaction, 'date' | 'amount'>>): StatementImport['months'] {

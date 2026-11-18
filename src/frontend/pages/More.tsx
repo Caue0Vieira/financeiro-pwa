@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { Icon, PageHeading } from "../components/common";
 import { account, workspace } from "../components/Navigation";
 import type { Page } from "../types";
@@ -11,15 +10,13 @@ const shortcuts: Partial<Record<Page, { detail: string; tone: string }>> = {
 };
 
 export default function More({
-  monthControl,
   navigate,
 }: {
-  monthControl: ReactNode;
   navigate: (page: Page) => void;
 }) {
   return (
     <div className="more-page">
-      <PageHeading title="Mais" action={monthControl} />
+      <PageHeading title="Mais" />
       <nav className="more-shortcuts" aria-label="Atalhos financeiros">
         {workspace.map(({ id, label, icon }) => {
           const shortcut = shortcuts[id];

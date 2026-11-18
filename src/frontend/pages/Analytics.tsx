@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import type { AnalysisPeriod, Dashboard, FinanceService, SpendingAnalysis } from "../../contracts";
 import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from "../../date";
-import { HeaderMenu, Icon, PageHeading, categoryAppearance } from "../components/common";
+import { Icon, categoryAppearance } from "../components/common";
 import { dateLabel, money, monthName } from "../format";
 
 const periods = [
@@ -14,13 +14,11 @@ const axisMoney = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumF
 
 export default function Analytics({
   month,
-  monthControl,
   analyze,
   revision,
   onViewTransactions,
 }: {
   month: string;
-  monthControl: ReactNode;
   analyze: FinanceService["analysis"];
   revision: Dashboard;
   onViewTransactions: () => void;
@@ -75,14 +73,6 @@ export default function Analytics({
 
   return (
     <>
-      <PageHeading
-        title="Análise de gastos"
-        action={
-          <HeaderMenu icon="calendar" label="Selecionar mês da análise">
-            {monthControl}
-          </HeaderMenu>
-        }
-      />
       <div className="segmented period-tabs" role="group" aria-label="Período da análise">
         {periods.map(([value, label]) => (
           <button key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>
@@ -163,7 +153,7 @@ export default function Analytics({
           </section>
           <section className="panel screen-list">
             <header className="panel-head">
-              <h2>Principais categorias</h2>
+              <h2>Categorias no período</h2>
               <button className="text-button" onClick={onViewTransactions}>
                 Ver todas <Icon name="arrowRight" size={14} />
               </button>

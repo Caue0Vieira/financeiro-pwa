@@ -62,7 +62,7 @@ export default function Dashboard({
         </div>
       </header>
       <div className="home-layout">
-        <div className="screen-stack">
+        <div className="home-hero-stack">
           <section className="home-balance" aria-label="Saldo do mês">
             <div className="home-balance-content">
               <span className="home-balance-label">Saldo previsto</span>
@@ -105,6 +105,28 @@ export default function Dashboard({
               </button>
             ))}
           </div>
+        </div>
+        <section className="panel home-summary" aria-label="Resumo mensal">
+          <h2>Neste mês</h2>
+          <dl>
+            <div>
+              <dt>Recebido</dt>
+              <dd className="income">{money(data.received)}</dd>
+            </div>
+            <div>
+              <dt>Despesas</dt>
+              <dd>{money(data.expenses)}</dd>
+            </div>
+            <div>
+              <dt>A pagar</dt>
+              <dd>{money(data.toPay)}</dd>
+            </div>
+          </dl>
+          <button className="text-button" onClick={() => navigate("analytics")}>
+            Ver análise <Icon name="arrowRight" size={15} />
+          </button>
+        </section>
+        <div className="screen-stack home-main-stack">
           {invoiceReminders}
           <section className="panel recent-panel screen-list">
             <header className="panel-head">
@@ -136,27 +158,7 @@ export default function Dashboard({
             )}
           </section>
         </div>
-        <aside className="screen-stack home-aside" aria-label="Resumo mensal">
-          <section className="panel home-summary">
-            <h2>Neste mês</h2>
-            <dl>
-              <div>
-                <dt>Recebido</dt>
-                <dd className="income">{money(data.received)}</dd>
-              </div>
-              <div>
-                <dt>Despesas</dt>
-                <dd>{money(data.expenses)}</dd>
-              </div>
-              <div>
-                <dt>A pagar</dt>
-                <dd>{money(data.toPay)}</dd>
-              </div>
-            </dl>
-            <button className="text-button" onClick={() => navigate("analytics")}>
-              Ver análise <Icon name="arrowRight" size={15} />
-            </button>
-          </section>
+        <aside className="screen-stack home-aside" aria-label="Patrimônio e vencimentos">
           <section className="panel overview-investment">
             <header className="panel-head">
               <div>

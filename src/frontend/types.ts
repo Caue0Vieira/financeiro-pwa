@@ -4,7 +4,6 @@ export type Page =
   | "home"
   | "activity"
   | "analytics"
-  | "budget"
   | "cards"
   | "commitments"
   | "investments"

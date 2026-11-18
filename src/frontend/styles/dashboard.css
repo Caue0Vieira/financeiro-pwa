@@ -15,9 +15,24 @@
 .home-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(255px, .54fr);
-  gap: 19px;
-  align-items: start;
+  gap: 16px 19px;
+  align-items: stretch;
   color: var(--page-ink);
+}
+.home-hero-stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.home-main-stack,
+.home-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.home-main-stack .recent-panel,
+.home-aside .upcoming-panel {
+  flex: 1;
 }
 .home-balance {
   position: relative;
@@ -143,11 +158,12 @@
 .home-entry-row .transaction-info span { color: var(--page-muted); font-size: .75rem; }
 .home-entry-row .transaction-amount { font-size: .85rem; }
 .home-entry-row .income { color: var(--home-accent); }
+.home-summary { display: flex; flex-direction: column; }
 .home-summary dl { margin: 12px 0 5px; }
 .home-summary dl div { display: flex; justify-content: space-between; gap: 8px; padding-block: 10px; border-bottom: 1px solid var(--home-line); }
 .home-summary dt { color: var(--page-muted); }
 .home-summary dd { margin: 0; font-weight: 730; font-variant-numeric: tabular-nums; }
-.home-summary .text-button { margin-left: -9px; }
+.home-summary .text-button { margin-top: auto; align-self: flex-start; margin-left: -9px; }
 .home-aside .upcoming-panel { margin-bottom: 0; }
 .invoice-alerts {
   padding: 14px 16px;
@@ -160,6 +176,31 @@
 .invoice-alerts .card-row { padding-inline: 0; }
 .invoice-alerts .card-row:hover { background: var(--surface); }
 
+:root[data-theme="dark"] .home-balance {
+  border-color: #235347;
+  background: linear-gradient(135deg, #0B2B26 0%, #163832 62%, #235347 100%);
+  color: #DAF1DE;
+  box-shadow: inset 0 1px 0 #8EB69B24;
+}
+:root[data-theme="dark"] .home-balance-label { color: #8EB69B; }
+:root[data-theme="dark"] .home-balance-amount > button { color: #DAF1DE; }
+:root[data-theme="dark"] .home-confirmed { color: #DAF1DE; }
+:root[data-theme="dark"] .home-confirmed strong,
+:root[data-theme="dark"] .home-confirmed svg { color: #8EB69B; }
+:root[data-theme="dark"] .home-card-art {
+  border-color: #8EB69B33;
+  background:
+    radial-gradient(ellipse at 12% 8%, #8EB69B2e 2%, transparent 66%),
+    linear-gradient(160deg, #235347, #163832 58%, #0B2B26);
+  box-shadow: inset 0 1px 1px #DAF1DE1f, 0 8px 18px #051F2088;
+}
+:root[data-theme="dark"] .home-card-chip { background: #8EB69B38; }
+:root[data-theme="dark"] .home-card-signature b { color: #DAF1DE; }
+:root[data-theme="dark"] .home-entry-row .transaction-icon:not([data-tone]) {
+  background: #163832;
+  color: #DAF1DE;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .transaction.home-entry-row:hover, .home-quick-actions button:hover { background: var(--home-action-mint); }
 }
@@ -168,11 +209,11 @@
   .home-heading { margin-bottom: 14px; }
   .home-heading h1 { font-family: inherit; font-size: 1.37rem; font-weight: 800; letter-spacing: -.028em; }
   .home-heading p { font-size: .86rem; margin-bottom: 2px; }
-  .home-period, .home-aside { display: none; }
+  .home-period, .home-summary, .home-aside { display: none; }
   .home-avatar { display: grid; width: 46px; height: 46px; padding: 0; background: transparent; }
   .home-avatar .avatar { width: 44px; height: 44px; background: var(--home-action); color: var(--home-accent); }
-  .home-layout { grid-template-columns: minmax(0, 1fr); }
-  .home-layout .screen-stack { gap: 13px; }
+  .home-layout { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+  .home-hero-stack, .home-layout .screen-stack { gap: 13px; }
   .home-balance { min-height: 137px; padding: 15px; border-radius: 14px; }
   .home-balance-label { font-size: .84rem; }
   .home-balance-amount > strong { font-size: clamp(1.4rem, 6.45vw, 1.82rem); }
@@ -184,7 +225,7 @@
     border-top: 1px solid var(--home-line);
     box-shadow: none;
   }
-  .app-shell[data-page="home"] .mobile-nav button:not(.active) { color: var(--page-muted); }
+  .app-shell[data-page="home"] .mobile-nav button:not(.active):not(.mobile-add) { color: var(--page-muted); }
 }
 @media (max-width: 355px) {
   .app-shell[data-page="home"] .main { padding-inline: 13px; }

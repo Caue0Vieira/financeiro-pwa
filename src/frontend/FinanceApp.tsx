@@ -8,14 +8,14 @@ import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./compo
 import { MobileNav, Sidebar } from "./components/Navigation";
 import Activity, { type ActivityFilter } from "./pages/Activity";
 import Dashboard from "./pages/Dashboard";
-import Analytics from "./pages/Analytics";
-import Budget from "./pages/Budget";
 import Cards from "./pages/Cards";
 import Commitments from "./pages/Commitments";
 import Goals from "./pages/Goals";
 import Investments from "./pages/Investments";
 import More from "./pages/More";
+import Planning from "./pages/Planning";
 import Profile from "./pages/Profile";
+import { ThemeToggle } from "./components/ThemeToggle";
 import type { EditModal, FinanceCommands, Page } from "./types";
 import "./styles/app.css";
 import "./styles/screens.css";
@@ -167,15 +167,14 @@ export default function FinanceApp({
       />
     ),
     analytics: (
-      <Analytics
-        month={month}
+      <Planning
+        data={data}
         monthControl={monthControl}
         analyze={commands.analysis}
-        revision={data}
+        openEditor={openEditor}
         onViewTransactions={() => navigate("activity", "expense")}
       />
     ),
-    budget: <Budget data={data} monthControl={monthControl} openEditor={openEditor} />,
     cards: <Cards cards={activeCards} accounts={data.accounts} openEditor={openEditor} />,
     commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
     investments: <Investments data={data} setModal={openEditor} />,
@@ -202,7 +201,7 @@ export default function FinanceApp({
         navigate={navigate}
       />
     ),
-    more: <More monthControl={monthControl} navigate={navigate} />,
+    more: <More navigate={navigate} />,
   };
 
   return (
@@ -228,8 +227,29 @@ export default function FinanceApp({
                 <Icon name="plus" size={18} /> Novo lançamento
               </button>
             )}
-            <button className="profile-action" onClick={() => navigate("profile")} aria-label="Abrir perfil">
+            <div className="top-pill" role="group" aria-label="Tema e notificações">
+              <ThemeToggle />
+              <button
+                type="button"
+                className="top-pill-btn top-bell"
+                aria-label={
+                  invoiceAlerts.length
+                    ? `Notificações (${invoiceAlerts.length} faturas a pagar)`
+                    : "Notificações e compromissos"
+                }
+                onClick={() => navigate("commitments")}
+              >
+                <Icon name="bell" size={18} />
+                {invoiceAlerts.length > 0 && <span className="top-bell-dot" aria-hidden="true" />}
+              </button>
+            </div>
+            <button className="top-user-pill" onClick={() => navigate("profile")} aria-label="Abrir perfil">
               <Avatar profile={data.profile} />
+              <span className="top-user-meta">
+                <strong>{data.profile.name || "Sua conta"}</strong>
+                <small>{email || (preview ? "Demonstração" : "Minha conta")}</small>
+              </span>
+              <Icon name="chevronDown" size={16} />
             </button>
           </div>
         </div>
@@ -252,7 +272,7 @@ export default function FinanceApp({
           {pages[page]}
         </BackNavigation.Provider>
       </main>
-      <MobileNav page={page} navigate={navigate} />
+      <MobileNav page={page} navigate={navigate} onAdd={add} />
       {modal?.type === "card-picker" ? (
         <CardPicker
           accounts={data.accounts}

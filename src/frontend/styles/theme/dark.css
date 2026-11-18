@@ -1,32 +1,36 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #10211d;
-  --glow: #1a3d36;
-  --cool-glow: #172f38;
-  --surface: #1b2e29;
-  --glass: #192e28ed;
-  --glass-edge: #334b43;
-  --text: #edf8f0;
-  --muted: #b3c9be;
-  --line: #334a40;
-  --primary: #13785f;
-  --primary-hover: #0e654f;
-  --accent: #8ce9cd;
-  --accent-soft: #233e35;
+  --bg: #051F20;
+  --glow: #0B2B2666;
+  --cool-glow: transparent;
+  --surface: #0B2B26;
+  --glass: #0B2B26f2;
+  --glass-edge: #163832;
+  --glass-highlight: #8EB69B14;
+  --text: #EEF5F0;
+  --muted: #94A89D;
+  --line: #163832;
+  --primary: #235347;
+  --primary-hover: #2C6456;
+  --on-primary: #DAF1DE;
+  --accent: #8EB69B;
+  --accent-soft: #163832;
+  --feature-start: #0B2B26;
+  --feature-end: #235347;
   --focus: var(--accent);
   --danger: #ffb1bb;
   --danger-soft: #462831;
   --warning: #ffdcb1;
   --warning-soft: #3f2e20;
-  --chart-income: #39b893;
-  --chart-income-active: #89e8c8;
-  --chart-expenses: #668b7e;
-  --chart-expenses-active: #90ada1;
-  --shadow: 0 6px 22px #05100b27;
-  --overlay-backdrop: #0718138c;
-  --picker-shadow: 0 8px 24px #0007;
-  --mobile-surface: #132520;
-  --mobile-top: #1a322b;
+  --chart-income: #8EB69B;
+  --chart-income-active: #DAF1DE;
+  --chart-expenses: #235347;
+  --chart-expenses-active: #8EB69B;
+  --shadow: 0 8px 24px #020E0F70;
+  --overlay-backdrop: #051F20ad;
+  --picker-shadow: 0 8px 24px #0009;
+  --mobile-surface: #051F20;
+  --mobile-top: #0B2B26;
 
   --page-paper: var(--bg);
   --page-paper-end: var(--bg);
@@ -48,17 +52,17 @@
   --ref-portfolio: var(--accent-soft);
   --portfolio-line: var(--accent);
 
-  --login-haze: #0b2823e8;
-  --login-text: #f0fff7;
-  --login-muted: #c2e0d5;
-  --login-glass: linear-gradient(142deg, #2c5047dc, #163630d9);
-  --login-edge: #9bcabd76;
-  --login-depth: #021e18a6;
-  --login-refract: #d9fff145;
-  --login-focus: #adf7dd;
+  --login-haze: #051F20e8;
+  --login-text: #DAF1DE;
+  --login-muted: #8EB69B;
+  --login-glass: linear-gradient(142deg, #163832dc, #0B2B26d9);
+  --login-edge: #8EB69B76;
+  --login-depth: #051F20a6;
+  --login-refract: #DAF1DE45;
+  --login-focus: #DAF1DE;
   --login-error-bg: #4e2634;
   --login-error-text: #ffdbe2;
-  --login-toggle: #21473de8;
+  --login-toggle: #163832e8;
 
   --welcome-text: var(--text);
   --welcome-muted: var(--muted);
@@ -66,6 +70,12 @@
   --welcome-glow: var(--glow);
   --welcome-surface: var(--surface);
   --welcome-scrim: linear-gradient(
-    180deg, #10211dfc 0%, #10211df2 23%, #10211d32 60%, #10211d6c 78%, #10211df0 100%
+    180deg, #051F20fc 0%, #051F20f2 23%, #051F2032 60%, #051F206c 78%, #051F20f0 100%
   );
+}
+
+:root[data-theme="dark"] .mobile-nav .mobile-add,
+:root[data-theme="dark"] .app-shell .mobile-nav .mobile-add {
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  box-shadow: 0 4px 14px rgba(52, 211, 153, 0.4);
 }

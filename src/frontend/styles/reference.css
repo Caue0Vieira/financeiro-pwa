@@ -112,48 +112,61 @@
 
 .profile-budget { background: linear-gradient(150deg, #00302f, #015a44 59%, #037b4f 100%); }
 .profile-budget-ring > strong { background: #075743; }
+:root[data-theme="dark"] .budget-card { background: linear-gradient(150deg, #0B2B26 8%, #163832 60%, #235347); border-color: #235347; }
+:root[data-theme="dark"] .profile-budget { background: linear-gradient(150deg, #0B2B26, #163832 59%, #235347 100%); border-color: #235347; }
+:root[data-theme="dark"] .profile-budget-ring > strong { background: #163832; }
+:root[data-theme="dark"] .feature-card { border-color: #235347; background: radial-gradient(ellipse at 100% 0, #8EB69B24, transparent 75%), linear-gradient(115deg, #0B2B26, #235347); color: #DAF1DE; }
+:root[data-theme="dark"] .reference-investment-cta { background: linear-gradient(160deg, #235347, #163832); color: #DAF1DE; }
+:root[data-theme="dark"] .spend-pop { background: #235347; color: #DAF1DE; }
+:root[data-theme="dark"] .spend-pop::after { border-top-color: #235347; }
+:root[data-theme="dark"] [data-page="activity"] .home-entry-row .transaction-icon:not([data-tone]),
+:root[data-theme="dark"] [data-page="analytics"] .transaction-icon:not([data-category]),
+:root[data-theme="dark"] [data-page="investments"] .portfolio-list .transaction-icon:not([data-portfolio-tone]) {
+  background: #163832;
+  color: #DAF1DE;
+}
 .profile-reminders { padding-left: 18px; color: var(--page-muted); font-size: .84rem; }
 [data-page="profile"] .profile-section + .profile-section, [data-page="profile"] .profile-link, [data-page="profile"] .profile-link + .profile-section { border-color: var(--ref-line); }
 
 @media (max-width: 820px) {
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) {
     background: linear-gradient(var(--page-paper) 37%, var(--page-paper-end));
     color: var(--page-ink);
   }
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .main {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .main {
     padding-inline: 19px;
   }
   .app-shell:is([data-page="activity"],[data-page="investments"]) .mobile-nav { display: none; }
   .app-shell:is([data-page="activity"],[data-page="investments"]) .main {
     padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading {
     min-height: 46px;
     margin-bottom: 12px;
   }
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading h1 {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading h1 {
     line-height: 1.15;
     font-family: inherit;
     font-size: 1.23rem;
     font-weight: 780;
   }
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading .icon-button {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .page-heading .icon-button {
     color: var(--page-ink);
   }
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) h2 {
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) h2 {
     font-family: inherit;
     font-size: 1rem;
     font-weight: 780;
     letter-spacing: -.02em;
   }
-  .app-shell:is([data-page="budget"],[data-page="goals"],[data-page="profile"]) .mobile-nav {
+  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav {
     --mobile-nav-accent: var(--ref-green);
     background: var(--page-paper);
     box-shadow: none;
     border-top-color: var(--ref-line);
   }
-  .app-shell:is([data-page="budget"],[data-page="goals"],[data-page="profile"]) .mobile-nav button:not(.active) { color: var(--page-muted); }
-  .app-shell:is([data-page="budget"],[data-page="goals"],[data-page="profile"]) .mobile-nav button svg { stroke-width: 1.9; }
+  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav button:not(.active):not(.mobile-add) { color: var(--page-muted); }
+  .app-shell:is([data-page="goals"],[data-page="profile"]) .mobile-nav button:not(.mobile-add) svg { stroke-width: 1.9; }
 
   [data-page="analytics"] .period-tabs { background: var(--ref-track); border: 0; border-radius: 999px; padding: 0; margin-bottom: 24px; }
   [data-page="analytics"] .period-tabs button, [data-page="activity"] .segmented button, [data-page="investments"] .portfolio-tabs button {
@@ -191,17 +204,17 @@
   [data-page="activity"] .activity-group + .activity-group { border: 0; margin-top: 6px; }
   [data-page="activity"] .transaction.home-entry-row { min-height: 62px; padding-inline: 2px; gap: 13px; }
 
-  [data-page="budget"] .budget-layout { gap: 17px; }
-  [data-page="budget"] .budget-card { min-height: 153px; padding: 17px; border-radius: 16px; }
-  [data-page="budget"] .budget-card .panel-head strong { font-family: inherit; font-size: 1.58rem; }
-  [data-page="budget"] .budget-card progress { height: 11px; }
-  [data-page="budget"] .spending-panel {
+  .planning-panel .budget-layout { gap: 17px; }
+  .planning-panel .budget-card { min-height: 153px; padding: 17px; border-radius: 16px; }
+  .planning-panel .budget-card .panel-head strong { font-family: inherit; font-size: 1.58rem; }
+  .planning-panel .budget-card progress { height: 11px; }
+  .budget-layout .spending-panel {
     border: 0; border-radius: 0; padding: 2px 0; box-shadow: none; background: transparent; gap: 17px 14px;
   }
-  [data-page="budget"] .spending-panel .donut { width: clamp(111px, 38vw, 155px); height: clamp(111px, 38vw, 155px); }
-  [data-page="budget"] .spending-panel .donut > div { width: 72%; height: 72%; background: var(--page-paper); }
-  [data-page="budget"] .category-list strong { color: var(--page-muted); }
-  [data-page="budget"] .category-list li > span { color: var(--page-ink); }
+  .budget-layout .spending-panel .donut { width: clamp(111px, 38vw, 155px); height: clamp(111px, 38vw, 155px); }
+  .budget-layout .spending-panel .donut > div { width: 72%; height: 72%; background: var(--page-paper); }
+  .budget-layout .category-list strong { color: var(--page-muted); }
+  .budget-layout .category-list li > span { color: var(--page-ink); }
 
   [data-page="goals"] .screen-heading-action { background: transparent; color: var(--page-ink); }
   [data-page="goals"] .goals-banner { min-height: 153px; }
@@ -221,20 +234,39 @@
   [data-page="investments"] .portfolio-row { border-color: var(--ref-line); min-height: 68px; }
   [data-page="investments"] .portfolio-row .income { color: var(--ref-positive); }
 
-  [data-page="profile"] .page-heading { justify-content: flex-end; margin-bottom: 2px; }
-  [data-page="profile"] .page-heading .mobile-back { display: none; }
-  [data-page="profile"] .page-heading-title h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  [data-page="profile"] .profile-hero { margin-bottom: 12px; gap: 13px; }
-  [data-page="profile"] .profile-hero .avatar { width: 64px; height: 64px; }
-  [data-page="profile"] .profile-hero p { color: var(--page-muted); font-size: .81rem; margin-top: 4px; }
-  [data-page="profile"] .profile-budget { min-height: 107px; margin-bottom: 11px; border-radius: 15px; }
-  [data-page="profile"] .profile-budget > span > strong { font-family: inherit; font-size: 1.16rem; }
-  [data-page="profile"] .profile-section summary, [data-page="profile"] .profile-link { min-height: 49px; font-size: .87rem; }
+  .app-shell[data-page="profile"] .main {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .app-shell[data-page="profile"] .page-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  [data-page="profile"] .profile-layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-page="profile"] .profile-side,
+  [data-page="profile"] .profile-main { gap: 10px; }
+  [data-page="profile"] .profile-hero-card { padding: 0 0 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  [data-page="profile"] .profile-hero { margin: 0; gap: 12px; }
+  [data-page="profile"] .profile-hero .avatar { width: 54px; height: 54px; }
+  [data-page="profile"] .profile-hero p { color: var(--page-muted); font-size: .8rem; margin-top: 2px; }
+  [data-page="profile"] .profile-theme-pill { display: inline-flex; padding: 2px; }
+  [data-page="profile"] .profile-theme-pill .theme-toggle { width: 44px; height: 44px; }
+  [data-page="profile"] .profile-budget { min-height: 98px; padding: 15px 16px; margin: 0; border-radius: 15px; }
+  [data-page="profile"] .profile-budget > span > strong { font-family: inherit; font-size: 1.14rem; }
+  [data-page="profile"] .profile-shortcuts { gap: 8px; }
+  [data-page="profile"] .profile-shortcut-tile { min-height: 46px; padding: 9px 12px; border-color: var(--ref-line); font-size: .84rem; }
+  [data-page="profile"] .profile-section summary, [data-page="profile"] .profile-link { min-height: 47px; font-size: .87rem; }
   [data-page="profile"] .profile-section summary > svg, [data-page="profile"] .profile-link > svg { color: var(--page-muted); }
-  [data-page="profile"] .profile-signout { min-height: 45px; border: 0; border-radius: 999px; margin-top: 11px; background: var(--ref-action-soft); color: var(--ref-green); }
+  [data-page="profile"] .profile-signout { min-height: 45px; border: 0; border-radius: 999px; margin-top: 2px; background: var(--ref-action-soft); color: var(--ref-green); }
 }
 @media (max-width: 355px) {
-  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="budget"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .main { padding-inline: 12px; }
+  .app-shell:is([data-page="analytics"],[data-page="activity"],[data-page="goals"],[data-page="investments"],[data-page="profile"]) .main { padding-inline: 12px; }
   [data-page="analytics"] .spend-pop { font-size: .63rem; }
-  [data-page="budget"] .category-list li { font-size: .72rem; }
+  .budget-layout .category-list li { font-size: .72rem; }
 }

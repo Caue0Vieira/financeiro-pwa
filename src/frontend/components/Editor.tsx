@@ -17,7 +17,7 @@ import { Select } from "./Select";
 import MoneyField from "./MoneyField";
 import { parseBrazilianAmount } from "../../imports/parsers";
 import { dateLabel, kindLabel, money, monthName } from "../format";
-import { findMerchant, isShopping, merchants } from "../merchants";
+import { findMerchant, inferCategory, isShopping, merchants } from "../merchants";
 import type { EditModal } from "../types";
 
 export default function Editor({
@@ -64,6 +64,7 @@ export default function Editor({
   const [cardName, setCardName] = useState(type === "card" && item?.name !== currentBank ? (item?.name ?? "") : "");
   const bankOptionsId = useId();
   const [description, setDescription] = useState(type === "entry" ? (item?.description ?? "") : "");
+  const [category, setCategory] = useState(type === "entry" ? (item?.category ?? "") : "");
   const [paymentMethod, setPaymentMethod] = useState(() => {
     if (type !== "entry") return "";
     if (item?.cardId) return `card:${item.cardId}`;
@@ -133,8 +134,8 @@ export default function Editor({
     const f = new FormData(e.currentTarget);
     if (type === "entry") {
       const raw = cents(f, "amount");
-      const merchant = findMerchant(description);
-      const inferredCategory = kind === "expense" ? (merchant?.category ?? (isShopping(description) ? "Compras" : "")) : "";
+      const inferred = kind === "expense" ? inferCategory(description) : "";
+      const finalCategory = category.trim() || read(f, "category") || (item ? "" : inferred);
       void mutate({
         type: "saveEntry",
         entry: {
@@ -150,7 +151,7 @@ export default function Editor({
               ? -raw
               : raw,
           kind,
-          category: read(f, "category") || (item ? "" : inferredCategory),
+          category: finalCategory,
           status: read(f, "status") as Entry["status"],
           accountId,
           cardId,
@@ -274,23 +275,33 @@ export default function Editor({
                 label="Descrição"
                 name="description"
                 value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder={kind === "income" ? "Ex.: Salário" : "Ex.: Mercado ou Netflix"}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setDescription(val);
+                  const inf = inferCategory(val);
+                  if (inf) setCategory(inf);
+                }}
+                placeholder={kind === "income" ? "Ex.: Salário" : "Ex.: iFood, ChatGPT, Uber..."}
                 pattern={".*\\S.*"}
                 required
                 full
               />
               {!item && kind === "expense" && (
                 <div className="entry-shortcuts full" role="group" aria-label="Atalhos de descrição">
-                  {merchants.slice(0, 5).map((merchant) => (
+                  {merchants.slice(0, 7).map((merchant) => (
                     <button
                       key={merchant.name}
                       type="button"
                       className="entry-shortcut"
                       aria-label={merchant.name}
-                      title={merchant.name}
+                      title={`${merchant.name} (${merchant.category})`}
                       aria-pressed={description === merchant.name}
-                      onClick={() => setDescription(merchant.name)}
+                      onClick={() => {
+                        setDescription(merchant.name);
+                        setCategory(merchant.category);
+                        const amountEl = document.querySelector<HTMLInputElement>('input[name="amount"]');
+                        amountEl?.focus();
+                      }}
                     >
                       <span className="transaction-icon merchant-icon" style={{ backgroundColor: merchant.background }}>
                         <img src={merchant.icon} alt="" />
@@ -301,12 +312,23 @@ export default function Editor({
                     type="button"
                     className="entry-shortcut"
                     aria-label="Compra"
-                    title="Compra"
+                    title="Compra (Compras)"
                     aria-pressed={description === "Compra"}
-                    onClick={() => setDescription("Compra")}
+                    onClick={() => {
+                      setDescription("Compra");
+                      setCategory("Compras");
+                      const amountEl = document.querySelector<HTMLInputElement>('input[name="amount"]');
+                      amountEl?.focus();
+                    }}
                   >
                     <span className="transaction-icon tone-violet"><Icon name="cart" size={18} /></span>
                   </button>
+                </div>
+              )}
+              {kind === "expense" && (category || inferCategory(description)) && (
+                <div className="entry-inferred-tag full" style={{ fontSize: ".78rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: "6px", margin: "-6px 0 2px" }}>
+                  <Icon name="receipt" size={14} />
+                  <span>Categoria: <strong>{category || inferCategory(description)}</strong></span>
                 </div>
               )}
               <MoneyField
@@ -380,7 +402,8 @@ export default function Editor({
                   <Field
                     label="Categoria"
                     name="category"
-                    defaultValue={item?.category}
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
                     placeholder="Ex.: Alimentação"
                     full
                   />

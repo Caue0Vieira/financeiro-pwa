@@ -130,6 +130,7 @@ export default function App() {
     changePassword: service.changePassword,
     dashboard: service.dashboard,
     analysis: service.analysis,
+    bankConnections: service.bankConnections,
     refresh,
   };
   return (

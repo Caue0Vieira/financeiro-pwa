@@ -1,9 +1,8 @@
-const CACHE_NAME = 'financeiro-static-v10';
+const CACHE_NAME = 'financeiro-static-v11';
 const OFFLINE_PATH = '/offline.html';
 const STATIC_PATHS = new Set([
   OFFLINE_PATH,
   '/offline.css',
-  '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable.png',
@@ -42,10 +41,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // The manifest is never cached: the Worker answers it with the icon chosen in the app.
   const isStatic = STATIC_PATHS.has(url.pathname)
     || url.pathname.startsWith('/assets/')
-    || url.pathname.startsWith('/icons/')
-    || /^\/manifest(-[a-z]+)?\.webmanifest$/.test(url.pathname);
+    || url.pathname.startsWith('/icons/');
   if (!isStatic) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);

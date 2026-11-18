@@ -1,23 +1,10 @@
 import { useSyncExternalStore } from "react";
+import { appIcons, defaultIcon, iconCookie, iconPath, isAppIcon, type AppIconId } from "../../appIcons";
 
-export const appIcons = [
-  { id: "esmeralda", label: "Esmeralda" },
-  { id: "safira", label: "Safira" },
-  { id: "ametista", label: "Ametista" },
-  { id: "rubi", label: "Rubi" },
-  { id: "ambar", label: "Âmbar" },
-  { id: "grafite", label: "Grafite" },
-] as const;
-
-export type AppIconId = (typeof appIcons)[number]["id"];
+export { appIcons, iconPath, type AppIconId };
 
 const storageKey = "finance-app-icon";
-const defaultIcon: AppIconId = "esmeralda";
 const listeners = new Set<() => void>();
-
-function isAppIcon(value: unknown): value is AppIconId {
-  return appIcons.some((icon) => icon.id === value);
-}
 
 function readStoredIcon(): AppIconId {
   try {
@@ -30,26 +17,22 @@ function readStoredIcon(): AppIconId {
 
 let current = readStoredIcon();
 
-export function iconPath(id: AppIconId, file = "icon-192.png") {
-  return id === defaultIcon ? `/icons/${file}?v=4` : `/icons/${id}/${file}?v=4`;
-}
-
 export function readAppIcon(): AppIconId {
   return current;
 }
 
 /**
- * Points the favicon, the iOS home-screen icon and the install manifest at the chosen icon,
- * and sets data-accent so the glass gradients follow its colour (see accents.css).
+ * Points the favicon and the iOS home-screen icon at the chosen icon, sets data-accent so the
+ * glass gradients follow its colour (see accents.css), and stores the choice in a cookie: the
+ * Worker serves /manifest.webmanifest from it, so the manifest URL never changes and browsers
+ * that update installed apps (Chrome on Android and desktop) pick up the new icon.
  */
 export function applyAppIcon(id: AppIconId) {
   const head = document.head;
   document.documentElement.dataset.accent = id;
   head.querySelector('link[rel="icon"]')?.setAttribute("href", iconPath(id));
   head.querySelector('link[rel="apple-touch-icon"]')?.setAttribute("href", iconPath(id, "apple-touch-icon.png"));
-  head
-    .querySelector('link[rel="manifest"]')
-    ?.setAttribute("href", id === defaultIcon ? "/manifest.webmanifest" : `/manifest-${id}.webmanifest`);
+  document.cookie = `${iconCookie}=${id}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
 export function saveAppIcon(id: AppIconId) {

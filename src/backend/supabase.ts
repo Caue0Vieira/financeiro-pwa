@@ -3,6 +3,7 @@ import { encodeAvatar } from "./avatar";
 import { invoiceDates, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import type {
+  BankConnections,
   FinanceService,
   Entry,
   Dashboard,
@@ -80,8 +81,36 @@ export function createSupabaseService(
     fail(error);
     return data.session?.user.email ? { email: data.session.user.email } : null;
   };
+  /** Calls the Worker's /api with the session token; the Pluggy secrets stay on the server. */
+  const api = async <T>(path: string, method = "POST", body?: unknown): Promise<T> => {
+    const { data } = await db.auth.getSession();
+    if (!data.session) throw new Error("Sessão encerrada");
+    const response = await fetch(`/api/pluggy/${path}`, {
+      method,
+      headers: { authorization: `Bearer ${data.session.access_token}`, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error ?? "Não foi possível falar com o servidor.");
+    return result as T;
+  };
+  const bankConnections: BankConnections = {
+    async list() {
+      const { data, error } = await db.from("pluggy_items")
+        .select("item_id, connector_name, status, last_synced_at").order("created_at");
+      fail(error);
+      return (data ?? []).map((x) => ({
+        itemId: x.item_id, bank: x.connector_name, status: x.status, lastSyncedAt: x.last_synced_at,
+      }));
+    },
+    connectToken: (itemId) => api<{ connectToken: string }>("connect-token", "POST", { itemId }).then((r) => r.connectToken),
+    register: (itemId) => api("items", "POST", { itemId }),
+    sync: () => api("sync"),
+    remove: (itemId) => api<void>(`items/${encodeURIComponent(itemId)}`, "DELETE"),
+  };
   return {
     session,
+    bankConnections,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),

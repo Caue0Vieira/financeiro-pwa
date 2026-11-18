@@ -157,4 +157,17 @@ export interface FinanceService {
   confirmImport(payload: ImportPayload): Promise<ImportResult>;
   saveProfile(name: string, avatar?: File | null): Promise<void>;
   changePassword(current: string, next: string): Promise<void>;
+  /** Open Finance through Pluggy; only with a real account (absent in the demo). */
+  bankConnections?: BankConnections;
+}
+
+export interface BankConnection { itemId: string; bank: string; status: string | null; lastSyncedAt: string | null }
+export interface BankConnections {
+  list(): Promise<BankConnection[]>;
+  /** Short-lived token for the Pluggy Connect widget (new connection, or `itemId` to reconnect). */
+  connectToken(itemId?: string): Promise<string>;
+  /** Stores a connection created in the widget and imports its transactions. */
+  register(itemId: string): Promise<{ inserted: number }>;
+  sync(): Promise<{ inserted: number }>;
+  remove(itemId: string): Promise<void>;
 }

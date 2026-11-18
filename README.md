@@ -42,6 +42,29 @@ Cada push na `master` dispara o workflow [`.github/workflows/deploy.yml`](.githu
 - `CLOUDFLARE_API_TOKEN`: token criado no painel da Cloudflare com o modelo **Edit Cloudflare Workers**.
 - `CLOUDFLARE_ACCOUNT_ID` (opcional): necessário só se o token tiver acesso a mais de uma conta.
 
+### Open Finance (Pluggy)
+
+O Worker em [src/worker](src/worker) responde só às rotas `/api/*` e guarda as credenciais da Pluggy e a chave `service_role` do Supabase como segredos da Cloudflare. O navegador chama essas rotas com o token da sessão e nunca recebe as credenciais. As compras novas chegam pelo webhook e pelo botão **Sincronizar** em **Cartões → Open Finance**.
+
+1. Aplique a migração [20261118230000_pluggy.sql](supabase/migrations/20261118230000_pluggy.sql) no SQL Editor do Supabase.
+2. Publique com `npx cf deploy` e cadastre cada segredo com o comando abaixo, colando o valor quando o terminal pedir. Não salve esses valores em arquivos do projeto.
+
+```sh
+npx cf workers secrets update SUPABASE_URL --worker financeiro-pwa
+npx cf workers secrets update SUPABASE_SERVICE_ROLE_KEY --worker financeiro-pwa
+npx cf workers secrets update PLUGGY_CLIENT_ID --worker financeiro-pwa
+npx cf workers secrets update PLUGGY_CLIENT_SECRET --worker financeiro-pwa
+npx cf workers secrets update PLUGGY_WEBHOOK_SECRET --worker financeiro-pwa
+```
+
+- `SUPABASE_URL`: a mesma URL do projeto. `SUPABASE_SERVICE_ROLE_KEY`: em **Project Settings → API Keys** (chave secreta; ignora o RLS, por isso fica só no Worker).
+- `PLUGGY_CLIENT_ID` e `PLUGGY_CLIENT_SECRET`: em **Applications** no painel da Pluggy.
+- `PLUGGY_WEBHOOK_SECRET`: um token aleatório de 64 caracteres. No painel da Pluggy, crie o webhook com a URL `https://<seu-worker>/api/pluggy/webhook` e o evento `all`, e em **Headers personalizados** adicione `X-Webhook-Token` com esse mesmo token. Se a sua conta tiver **Generate signing secret**, o valor `whsec_…` também funciona, sem header. O Worker recusa notificações sem um dos dois. Para gerar o token já copiado para a área de transferência:
+
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); (($b | ForEach-Object { $_.ToString('x2') }) -join '') | Set-Clipboard
+```
+
 No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adicionar à Tela de Início** e ative **Abrir como App da Web** quando essa opção aparecer.
 
 ## Arquivos de importação

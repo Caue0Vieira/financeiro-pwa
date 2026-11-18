@@ -7,6 +7,7 @@ import Editor from "./components/Editor";
 import InvoiceAlerts, { useInvoiceAlerts } from "./components/InvoiceAlerts";
 import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./components/common";
 import { MobileNav, Sidebar } from "./components/Navigation";
+import { BankConnectionsPanel } from "./components/BankConnectionsPanel";
 import Activity, { type ActivityFilter } from "./pages/Activity";
 import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
@@ -182,7 +183,12 @@ export default function FinanceApp({
         onViewTransactions={() => navigate("activity", "expense")}
       />
     ),
-    cards: <Cards cards={activeCards} accounts={data.accounts} openEditor={openEditor} />,
+    cards: (
+      <>
+        <Cards cards={activeCards} accounts={data.accounts} openEditor={openEditor} />
+        <BankConnectionsPanel connections={commands.bankConnections} onImported={commands.refresh} showNotice={showNotice} />
+      </>
+    ),
     commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
     investments: <Investments data={data} setModal={openEditor} />,
     goals: <Goals data={data} openEditor={openEditor} />,

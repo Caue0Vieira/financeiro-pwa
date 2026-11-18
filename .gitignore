@@ -12,3 +12,4 @@ test-results/
 *.qfx
 *.csv
 !tests/fixtures/*.csv
+.dev.vars*

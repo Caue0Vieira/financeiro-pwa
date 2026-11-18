@@ -408,3 +408,13 @@
   .main { padding-inline: 12px; }
   .spend-plot button { font-size: .655rem; }
 }
+
+/* Open Finance (Pluggy) panel on the Cartões screen. */
+.bank-connections { margin-top: 16px; }
+.bank-connections > .subtle { margin: 4px 0 12px; }
+.bank-connection + .bank-connection { border-top: 1px solid var(--line); }
+.bank-connection-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 12px; margin-bottom: 6px; }
+.bank-connection-actions .subtle { font-size: .78rem; }
+.bank-connections .text-button { display: inline-flex; align-items: center; gap: 5px; }
+.bank-connections .danger-text { color: var(--danger); }
+.bank-connect { width: 100%; justify-content: center; margin: 8px 0 6px; }

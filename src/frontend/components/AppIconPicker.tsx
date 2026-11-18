@@ -25,8 +25,8 @@ export function AppIconPicker({ onChange }: { onChange?: (label: string) => void
         ))}
       </div>
       <p className="subtle">
-        Muda na hora o ícone da aba do navegador. Na tela inicial, o novo ícone aparece ao instalar o app; se ele já
-        estiver instalado, remova e adicione de novo.
+        Muda na hora no app e na aba do navegador. Na tela inicial, o Android e o Chrome atualizam o ícone sozinhos
+        em até um dia (podem pedir confirmação). No iPhone, remova o app da tela inicial e adicione de novo.
       </p>
     </div>
   );

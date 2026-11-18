@@ -122,6 +122,18 @@ await assert.rejects(() => db.query("update public.cards set design='<script>' w
 await db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-02-01','2026-02-06','2026-02-16')", [linkedCards[1].id]);
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-03-01','2026-03-20','2026-03-10')", [linkedCards[1].id]));
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month) values ($1,'2026-04-01')", [linkedCards[1].id]));
+// Pluggy: only the Worker (service role) writes connections; the owner can read them.
+await assert.rejects(() => db.query("insert into public.pluggy_items(user_id,item_id,connector_name) values ($1,'item-1','Banco Inter')", [owner]));
+await db.exec('reset role');
+await db.query("insert into public.pluggy_items(user_id,item_id,connector_name) values ($1,'item-1','Banco Inter')", [owner]);
+await db.query("insert into public.pluggy_accounts(pluggy_account_id,user_id,item_id,card_id) values ('acc-1',$1,'item-1',$2)", [owner, card]);
+await db.query("insert into public.transactions(user_id,card_id,occurred_on,description,amount_cents,kind,category,source,external_id) values ($1,$2,'2026-01-12','Pluggy',-990,'expense','Compras','pluggy','tx-1')", [owner, card]);
+await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false); set role authenticated;`);
+assert.equal((await db.query("select item_id from public.pluggy_items")).rows[0].item_id, 'item-1');
+assert.equal((await db.query("select card_id from public.pluggy_accounts")).rows[0].card_id, card);
+await assert.rejects(() => db.query("delete from public.pluggy_items where item_id='item-1' returning item_id").then(({ rows }) => { if (!rows.length) throw new Error('no rows'); }));
+await assert.rejects(() => db.query("select * from public.pluggy_events"));
+assert.equal((await db.query("select source from public.transactions where external_id='tx-1'")).rows[0].source, 'pluggy');
 await db.query("update public.cards set archived=true where id=$1", [card]);
 const archivedDashboard = (await db.query("select public.monthly_dashboard('2026-01-01') as value")).rows[0].value;
 assert.equal(archivedDashboard.cards.find(item => item.id === card)?.archived, true);
@@ -142,6 +154,8 @@ await assert.rejects(() => db.query("select public.save_card($1,'Cartão de outr
 await assert.rejects(() => db.query("insert into public.cards(name,account_id) values ('Banco de outro usuário',$1)", [account]));
 assert.deepEqual((await db.query("update public.cards set archived=true where id=$1 returning id", [dueCard])).rows, []);
 assert.equal((await db.query("select * from public.card_invoice_dates")).rows.length, 0);
+assert.equal((await db.query("select * from public.pluggy_items")).rows.length, 0);
+assert.equal((await db.query("select * from public.pluggy_accounts")).rows.length, 0);
 assert.deepEqual((await db.query("update public.cards set design='black' where id=$1 returning id", [linkedCards[1].id])).rows, []);
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,due_on) values ($1,'2026-05-01','2026-05-10')", [linkedCards[1].id]));
 console.log('Migration, card links, owner isolation, installment, import, and settlement invariants passed.');

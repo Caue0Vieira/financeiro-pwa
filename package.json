@@ -21,6 +21,7 @@
     "gsap": "3.15.1",
     "lucide-react": "1.55.0",
     "motion": "14.14.0",
+    "pluggy-connect-sdk": "2.15.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

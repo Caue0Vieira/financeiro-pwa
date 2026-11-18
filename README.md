@@ -34,6 +34,14 @@ npx cf auth login
 npx cf deploy
 ```
 
+### Deploy automático
+
+Cada push na `master` dispara o workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), que roda os testes, gera o build e publica com `cf deploy`. Ele também pode ser executado manualmente em **Actions → Deploy → Run workflow**. Configure estes segredos no repositório, em **Settings → Secrets and variables → Actions**:
+
+- `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`: os mesmos valores do `.env.production.local`.
+- `CLOUDFLARE_API_TOKEN`: token criado no painel da Cloudflare com o modelo **Edit Cloudflare Workers**.
+- `CLOUDFLARE_ACCOUNT_ID` (opcional): necessário só se o token tiver acesso a mais de uma conta.
+
 No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adicionar à Tela de Início** e ative **Abrir como App da Web** quando essa opção aparecer.
 
 ## Arquivos de importação

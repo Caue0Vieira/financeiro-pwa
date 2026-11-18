@@ -108,7 +108,10 @@ export default function FinanceApp({
       return;
     }
     setModal(undefined);
-    showNotice(savedMonth ? "Compromisso salvo." : action.type === "saveCard" && !action.card.id ? "Cartão cadastrado." : "Alterações salvas.");
+    const message = action.type === "archiveCard" ? "Cartão excluído."
+      : action.type === "saveCard" && !action.card.id ? "Cartão cadastrado."
+      : savedMonth ? "Compromisso salvo." : "Alterações salvas.";
+    showNotice(message);
     try {
       if (savedMonth && savedMonth !== month) onMonth(savedMonth);
       else await commands.refresh();
@@ -120,6 +123,7 @@ export default function FinanceApp({
   }
 
   const add = () => openEditor({ type: "entry" });
+  const activeCards = data.cards.filter((card) => !card.archived);
   const monthControl = <MonthControl month={month} onMonth={onMonth} />;
   const pages: Record<Page, ReactNode> = {
     home: (
@@ -153,7 +157,7 @@ export default function FinanceApp({
       />
     ),
     budget: <Budget data={data} monthControl={monthControl} openEditor={openEditor} />,
-    cards: <Cards cards={data.cards} accounts={data.accounts} openEditor={openEditor} />,
+    cards: <Cards cards={activeCards} accounts={data.accounts} openEditor={openEditor} />,
     commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
     investments: <Investments data={data} setModal={openEditor} />,
     goals: <Goals data={data} openEditor={openEditor} />,
@@ -260,7 +264,7 @@ export default function FinanceApp({
         />
       ) : modal?.type === "commitment" ? (
         <CommitmentEditor
-          cards={data.cards}
+          cards={activeCards}
           month={month}
           busy={busy}
           error={editorError}

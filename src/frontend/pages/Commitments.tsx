@@ -54,7 +54,7 @@ export default function Commitments({
                     <div className="transaction-info">
                       <strong>{card?.name || "Cartão"}</strong>
                       <span>
-                        {[i.dueDate && `Vence ${dateLabel(i.dueDate)}`, i.paid > 0 && `Pago ${money(i.paid)}`]
+                      {[card?.archived && "Cartão excluído", i.dueDate && `Vence ${dateLabel(i.dueDate)}`, i.paid > 0 && `Pago ${money(i.paid)}`]
                           .filter(Boolean).join(" · ")}
                       </span>
                     </div>

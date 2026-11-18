@@ -223,6 +223,16 @@ export function createSupabaseService(
           fail(error);
           break;
         }
+        case "archiveCard": {
+          const { data, error } = await db.from("cards")
+            .update({ archived: true })
+            .eq("id", action.id)
+            .select("id")
+            .maybeSingle();
+          fail(error);
+          if (!data) throw new Error("Cartão não encontrado.");
+          break;
+        }
         case "saveInvestment": {
           const x = action.investment;
           await upsert("investments", {
@@ -493,6 +503,7 @@ export function createSupabaseService(
           name: x.name,
           dueDay: x.due_day,
           accountId: x.account_id ?? undefined,
+          archived: x.archived === true,
         })),
         investments: investments.map((x) => ({
           id: x.id,

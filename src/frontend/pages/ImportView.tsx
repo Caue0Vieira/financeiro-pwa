@@ -85,9 +85,10 @@ function suggest(row: ImportRow, candidates: Entry[]): Entry | undefined {
   return matches.length === 1 ? matches[0] : undefined;
 }
 export default function ImportView({ data, month, loadHistoryPage, confirmImport, refresh }: Props) {
+  const activeCards = data.cards.filter((card) => !card.archived);
   const [type, setType] = useState<"statement" | "invoice">("statement");
   const [accountId, setAccountId] = useState(data.accounts[0]?.id ?? "");
-  const [cardId, setCardId] = useState(data.cards[0]?.id ?? "");
+  const [cardId, setCardId] = useState(activeCards[0]?.id ?? "");
   const [invoiceMonth, setInvoiceMonth] = useState(month);
   const [file, setFile] = useState<File>();
   const [text, setText] = useState("");
@@ -298,7 +299,7 @@ export default function ImportView({ data, month, loadHistoryPage, confirmImport
                   }}
                 >
                   <option value="">Selecione</option>
-                  {data.cards.map((c) => (
+                  {activeCards.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

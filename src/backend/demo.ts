@@ -198,7 +198,13 @@ export function createDemoService(): FinanceService {
             account = { id: crypto.randomUUID(), name: bank };
             accounts.push(account);
           }
-          put(cards, { id: id ?? crypto.randomUUID(), name, dueDay, accountId: account?.id });
+          put(cards, { ...previous, id: id ?? crypto.randomUUID(), name, dueDay, accountId: account?.id });
+          return;
+        }
+        case 'archiveCard': {
+          const card = cards.find((item) => item.id === action.id);
+          if (!card) throw new Error('Cartão não encontrado.');
+          put(cards, { ...card, archived: true });
           return;
         }
         case 'saveInvestment': {

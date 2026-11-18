@@ -111,6 +111,12 @@ assert.deepEqual(planning.targets,[{id:goal,name:'Viagem',amount:90000,saved:250
 assert.deepEqual(planning.valuations,[{date:'2026-01-10',value:200000},{date:'2026-01-20',value:212000}]);
 const expenseDays=(await db.query("select public.nitido_expense_days('2026-01-01','2026-02-01') as value")).rows[0].value;
 assert.ok(expenseDays.some(row=>row.category==='Casa' && row.amount>0));
+await db.query("update public.cards set archived=true where id=$1", [card]);
+const archivedDashboard = (await db.query("select public.monthly_dashboard('2026-01-01') as value")).rows[0].value;
+assert.equal(archivedDashboard.cards.find(item => item.id === card)?.archived, true);
+assert.equal(archivedDashboard.cards.find(item => item.id === dueCard)?.archived, false);
+assert.ok(archivedDashboard.invoice_rows.some(item => item.card_id === card));
+assert.ok(archivedDashboard.invoices.some(item => item.card_id === card));
 await db.exec('reset role');
 const other='00000000-0000-0000-0000-000000000002';
 await db.query('insert into auth.users(id) values ($1)',[other]);
@@ -123,5 +129,6 @@ await assert.rejects(()=>db.query("insert into public.goal_contributions(goal_id
 await assert.rejects(()=>db.query("select public.settle_invoice($1,$2,'2026-01-01',1)",[payment1,card]));
 await assert.rejects(() => db.query("select public.save_card($1,'Cartão de outro usuário','Conta',null)", [linkedCards[0].id]));
 await assert.rejects(() => db.query("insert into public.cards(name,account_id) values ('Banco de outro usuário',$1)", [account]));
+assert.deepEqual((await db.query("update public.cards set archived=true where id=$1 returning id", [dueCard])).rows, []);
 console.log('Migration, card links, owner isolation, installment, import, and settlement invariants passed.');
 await db.close();

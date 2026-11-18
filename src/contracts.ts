@@ -21,7 +21,7 @@ export interface Entry {
 }
 
 export interface Account { id: string; name: string }
-export interface Card { id: string; name: string; dueDay: number | null; accountId?: string }
+export interface Card { id: string; name: string; dueDay: number | null; accountId?: string; archived?: boolean }
 export interface Investment {
   id: string;
   institution: string;
@@ -94,6 +94,7 @@ export type Action =
   | { type: 'deleteEntry'; id: string }
   | { type: 'saveAccount'; account: Omit<Account, 'id'> & { id?: string } }
   | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay'> & { id?: string; bank?: string } }
+  | { type: 'archiveCard'; id: string }
   | { type: 'saveInvestment'; investment: Omit<Investment, 'id'> & { id?: string } }
   | { type: 'deleteInvestment'; id: string }
   | { type: 'saveRecurrence'; recurrence: Omit<Recurrence, 'id'> & { id?: string }; effectiveMonth?: string }

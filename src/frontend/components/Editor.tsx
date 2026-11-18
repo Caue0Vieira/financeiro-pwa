@@ -48,6 +48,7 @@ export default function Editor({
     if (type === "entry") removeAction = { type: "deleteEntry", id: item.id };
     if (type === "investment") removeAction = { type: "deleteInvestment", id: item.id };
     if (type === "target") removeAction = { type: "deleteTarget", id: item.id };
+    if (type === "card") removeAction = { type: "archiveCard", id: item.id };
   }
   const today = todayInSaoPaulo();
   const entryDate = (type === "entry" && item?.date) || (today.startsWith(month) ? today : `${month}-01`);
@@ -70,8 +71,9 @@ export default function Editor({
   });
   const cardId = paymentMethod.startsWith("card:") ? paymentMethod.slice(5) : undefined;
   const accountId = paymentMethod.startsWith("account:") ? paymentMethod.slice(8) : undefined;
+  const visibleCards = data.cards.filter((card) => !card.archived || (type === "entry" && card.id === item?.cardId));
   const paymentAccounts = data.accounts.filter(
-    (account) => kind === "card_payment" || account.id === accountId || data.cards.some((card) => card.accountId === account.id),
+    (account) => kind === "card_payment" || account.id === accountId || visibleCards.some((card) => card.accountId === account.id),
   );
   const [remove, setRemove] = useState(false);
   const [paymentMonth, setPaymentMonth] = useState<string>(type === "settle" ? item.month : month);
@@ -331,7 +333,7 @@ export default function Editor({
                   </Select>
                 </Field>
               )}
-              {(paymentAccounts.length > 0 || data.cards.length > 0) && (
+              {(paymentAccounts.length > 0 || visibleCards.length > 0) && (
                 <Field label="Banco ou cartão" full>
                   <Select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
                     <option value="">Sem vínculo</option>
@@ -340,9 +342,11 @@ export default function Editor({
                         {paymentAccounts.map(({ id, name }) => <option key={id} value={`account:${id}`}>{name}</option>)}
                       </optgroup>
                     )}
-                    {data.cards.length > 0 && (
+                    {visibleCards.length > 0 && (
                       <optgroup label="Cartões">
-                        {data.cards.map(({ id, name }) => <option key={id} value={`card:${id}`}>{name}</option>)}
+                        {visibleCards.map(({ id, name, archived }) => (
+                          <option key={id} value={`card:${id}`}>{name}{archived && " (excluído)"}</option>
+                        ))}
                       </optgroup>
                     )}
                   </Select>
@@ -643,8 +647,8 @@ export default function Editor({
             </button>
           )}
           {removeAction && !remove && (
-            <button type="button" className="button danger" onClick={() => setRemove(true)}>
-              {type === "recurrence" ? "Encerrar" : "Excluir"}
+            <button type="button" className="button danger" disabled={busy} onClick={() => setRemove(true)}>
+              {type === "recurrence" ? "Encerrar" : type === "card" ? "Excluir cartão" : "Excluir"}
             </button>
           )}
         </div>
@@ -653,7 +657,9 @@ export default function Editor({
             <p>
               {type === "recurrence"
                 ? "Encerrar esta recorrência neste mês?"
-                : "Excluir este item? Esta ação não pode ser desfeita."}
+                : type === "card"
+                  ? "Excluir este cartão? As compras e faturas registradas continuam no histórico."
+                  : "Excluir este item? Esta ação não pode ser desfeita."}
             </p>
             <button
               type="button"

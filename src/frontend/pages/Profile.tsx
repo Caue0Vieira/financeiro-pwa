@@ -6,6 +6,7 @@ import { ApiTiming } from "../components/ApiTiming";
 import { ProfilePhotoDialog } from "../components/ProfilePhotoDialog";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { AppIconPicker } from "../components/AppIconPicker";
+import { OpenFinanceGuide } from "../components/OpenFinanceGuide";
 import type { FinanceCommands, Page } from "../types";
 import { dateLabel } from "../format";
 
@@ -234,6 +235,7 @@ export default function Profile({
               <button className="text-button" onClick={() => navigate("import")}>
                 Abrir importação
               </button>
+              <OpenFinanceGuide onOpenConnections={() => navigate("connections")} />
               {!preview && <ApiTiming fetchDashboard={commands.dashboard} month={month} />}
             </ProfileSection>
           </div>

@@ -9,6 +9,7 @@ export type Page =
   | "investments"
   | "goals"
   | "import"
+  | "connections"
   | "profile"
   | "more";
 export type EditModal =

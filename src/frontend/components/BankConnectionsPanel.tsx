@@ -26,10 +26,12 @@ export function BankConnectionsPanel({
   connections,
   onImported,
   showNotice,
+  onOpenHelp,
 }: {
   connections?: BankConnections;
   onImported: () => Promise<void>;
   showNotice: (message: string, kind?: "success" | "error") => void;
+  onOpenHelp: () => void;
 }) {
   const { resolvedTheme } = useTheme();
   const [items, setItems] = useState<BankConnection[]>([]);
@@ -87,7 +89,7 @@ export function BankConnectionsPanel({
   if (!connections) {
     return (
       <section className="panel bank-connections">
-        <header className="panel-head"><h2>Open Finance</h2></header>
+        <header className="panel-head"><h2>Conexões</h2></header>
         <p className="subtle">Conecte seus bancos para importar compras automaticamente. Disponível ao entrar na sua conta.</p>
       </section>
     );
@@ -96,7 +98,7 @@ export function BankConnectionsPanel({
   return (
     <section className="panel screen-list bank-connections" aria-busy={busy !== null}>
       <header className="panel-head">
-        <h2>Open Finance</h2>
+        <h2>Conexões</h2>
         {items.length > 0 && (
           <button
             className="text-button"
@@ -180,16 +182,9 @@ export function BankConnectionsPanel({
         </label>
         <button className="button" disabled={busy !== null}>{busy === "link" ? "Vinculando…" : "Vincular"}</button>
       </form>
-      <details className="form-details bank-link-help">
-        <summary>Como pegar o ID no Meu Pluggy</summary>
-        <ol>
-          <li>Em meu.pluggy.ai, crie a conta e conecte o seu banco.</li>
-          <li>No painel da Pluggy, abra a sua aplicação e habilite o conector MeuPluggy, se ele não aparecer.</li>
-          <li>Crie uma conexão, escolha MeuPluggy, entre com a conta do Meu Pluggy e autorize.</li>
-          <li>Copie o ID da conexão (Item ID) e cole acima. Faça isso para cada banco.</li>
-        </ol>
-        <p className="subtle">Os dados atualizam sozinhos uma vez por dia pelo Meu Pluggy.</p>
-      </details>
+      <button type="button" className="text-button bank-link-help" onClick={onOpenHelp}>
+        <Icon name="help" size={15} /> Como achar o ID? Ver passo a passo em Ajuda e suporte
+      </button>
       <button className="text-button bank-connect-widget" disabled={busy !== null} onClick={() => void connect()}>
         <Icon name="bank" size={15} /> {busy === "connect" ? "Abrindo…" : "Conectar direto pela Pluggy (plano pago)"}
       </button>

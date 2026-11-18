@@ -239,8 +239,8 @@
   [data-page="profile"] .profile-budget > span > strong { font-family: inherit; font-size: 1.14rem; }
   [data-page="profile"] .profile-shortcuts { gap: 8px; }
   [data-page="profile"] .profile-shortcut-tile { min-height: 46px; padding: 9px 12px; border-color: var(--ref-line); font-size: .84rem; }
-  [data-page="profile"] .profile-section summary, [data-page="profile"] .profile-link { min-height: 47px; font-size: .87rem; }
-  [data-page="profile"] .profile-section summary > svg, [data-page="profile"] .profile-link > svg { color: var(--page-muted); }
+  [data-page="profile"] .profile-section > summary, [data-page="profile"] .profile-link { min-height: 47px; font-size: .87rem; }
+  [data-page="profile"] .profile-section > summary > svg, [data-page="profile"] .profile-link > svg { color: var(--page-muted); }
   [data-page="profile"] .profile-signout { min-height: 45px; border: 0; border-radius: 999px; margin-top: 2px; background: var(--ref-action-soft); color: var(--ref-green); }
 }
 @media (max-width: 355px) {

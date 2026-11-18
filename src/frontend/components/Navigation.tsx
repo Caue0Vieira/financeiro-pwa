@@ -17,6 +17,7 @@ export const workspace = [
 
 export const account = [
   { id: "import", label: "Importar arquivos", icon: "upload" },
+  { id: "connections", label: "Open Finance", icon: "bank" },
   { id: "profile", label: "Perfil", icon: "user" },
 ] as const;
 

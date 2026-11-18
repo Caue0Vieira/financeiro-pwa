@@ -44,7 +44,7 @@ Cada push na `master` dispara o workflow [`.github/workflows/deploy.yml`](.githu
 
 ### Open Finance (Pluggy)
 
-O Worker em [src/worker](src/worker) responde só às rotas `/api/*` e guarda as credenciais da Pluggy e a chave `service_role` do Supabase como segredos da Cloudflare. O navegador chama essas rotas com o token da sessão e nunca recebe as credenciais. As compras novas chegam pelo webhook e pelo botão **Sincronizar** em **Cartões → Open Finance**.
+O Worker em [src/worker](src/worker) responde só às rotas `/api/*` e guarda as credenciais da Pluggy e a chave `service_role` do Supabase como segredos da Cloudflare. O navegador chama essas rotas com o token da sessão e nunca recebe as credenciais. As compras novas chegam pelo webhook e pelo botão **Sincronizar** na tela **Open Finance**; o passo a passo do Meu Pluggy está em **Perfil → Ajuda e suporte**.
 
 1. Aplique a migração [20261118230000_pluggy.sql](supabase/migrations/20261118230000_pluggy.sql) no SQL Editor do Supabase.
 2. Publique com `npx cf deploy` e cadastre cada segredo com o comando abaixo, colando o valor quando o terminal pedir. Não salve esses valores em arquivos do projeto.

@@ -16,6 +16,7 @@ input::placeholder { color: var(--muted); }
   background: var(--surface);
   color: var(--text);
 }
+.field input[type="date"], .field input[type="month"] { padding-inline: 8px; }
 .field input::placeholder { font-weight: 450; opacity: 1; }
 .select-control option { background: Canvas; color: CanvasText; }
 .select-control option:checked { background: var(--accent-soft); color: var(--accent); }
@@ -103,7 +104,7 @@ input::placeholder { color: var(--muted); }
   font-size: .84rem;
   font-weight: 700;
 }
-.entry-shortcuts { display: flex; flex-wrap: wrap; gap: 4px; }
+.entry-shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); justify-items: center; gap: 6px 4px; }
 .entry-shortcut {
   display: grid;
   place-items: center;
@@ -146,6 +147,9 @@ input::placeholder { color: var(--muted); }
 .bank-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
 @media (pointer: coarse) {
   .field input, .select-control { font-size: 1rem; }
+}
+@container (max-width: 330px) {
+  .form-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 355px) {
   .form-grid { grid-template-columns: 1fr; }

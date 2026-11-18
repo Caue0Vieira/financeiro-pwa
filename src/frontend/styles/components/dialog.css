@@ -9,10 +9,26 @@
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--overlay-shadow);
+  container-type: inline-size;
 }
 .modal[open] { animation: dialog-in 160ms var(--ease-out); }
 .modal::backdrop { background: var(--overlay-backdrop); backdrop-filter: blur(5px); }
-.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -5px -5px 13px 0; }
+.modal-header {
+  position: sticky;
+  top: -19px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -19px -19px 13px;
+  padding: 14px 14px 8px 19px;
+  background: var(--surface);
+}
+@media (max-width: 480px) {
+  .modal { width: calc(100% - 16px); padding: 15px; border-radius: 18px; }
+  .modal-header { top: -15px; margin: -15px -15px 11px; padding: 11px 10px 7px 15px; }
+}
 @keyframes dialog-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 .inline-error, .confirm-delete {
   color: var(--danger);

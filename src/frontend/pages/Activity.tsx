@@ -30,14 +30,16 @@ function dateHeading(date: string, today: string) {
 }
 
 export default function Activity({
-  data,
+  month,
+  revision,
   history,
   monthControl,
   openEditor,
   initialFilter,
   onImport,
 }: {
-  data: Dashboard;
+  month: string;
+  revision: Dashboard;
   history: FinanceService["history"];
   monthControl: ReactNode;
   openEditor: OpenEditor;
@@ -52,7 +54,7 @@ export default function Activity({
   const [query, setQuery] = useState("");
   const [retry, setRetry] = useState(0);
   const version = useRef(0);
-  const current = result?.month === data.month ? result : undefined;
+  const current = result?.month === month ? result : undefined;
   const rows = current?.rows ?? [];
   const loadingMonth = loading || (!current && !error);
 
@@ -60,10 +62,10 @@ export default function Activity({
     const request = ++version.current;
     setLoading(true);
     setError("");
-    void history(data.month, 0, batchSize)
+    void history(month, 0, batchSize)
       .then((entries) => {
         if (request !== version.current) return;
-        setResult({ month: data.month, rows: entries, hasMore: entries.length === batchSize });
+        setResult({ month, rows: entries, hasMore: entries.length === batchSize });
       })
       .catch(() => {
         if (request === version.current) setError("Não foi possível carregar as transações.");
@@ -74,16 +76,16 @@ export default function Activity({
     return () => {
       version.current++;
     };
-  }, [data, history, retry]);
+  }, [month, revision, history, retry]);
 
   async function loadMore() {
     const request = ++version.current;
     setLoading(true);
     setError("");
     try {
-      const entries = await history(data.month, rows.length, batchSize);
+      const entries = await history(month, rows.length, batchSize);
       if (request !== version.current) return;
-      setResult({ month: data.month, rows: [...rows, ...entries], hasMore: entries.length === batchSize });
+      setResult({ month, rows: [...rows, ...entries], hasMore: entries.length === batchSize });
     } catch {
       if (request === version.current) setError("Não foi possível carregar mais transações.");
     } finally {

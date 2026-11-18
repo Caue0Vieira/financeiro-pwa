@@ -47,6 +47,7 @@ export default function FinanceApp({
 }: Props) {
   const [page, setPage] = useState<Page>("home");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [activityMonth, setActivityMonth] = useState(data.month);
   const trail = useRef<Page[]>([]);
   const [modal, setModal] = useState<EditModal>();
   const [notice, setNotice] = useState<Notice>();
@@ -84,7 +85,10 @@ export default function FinanceApp({
     else trail.current.push(page);
     moveFocus.current = true;
     setNotice(undefined);
-    if (next === "activity") setActivityFilter(filter);
+    if (next === "activity") {
+      setActivityFilter(filter);
+      setActivityMonth(month);
+    }
     setPage(next);
   }
 
@@ -153,9 +157,10 @@ export default function FinanceApp({
     activity: (
       <Activity
         key={activityFilter}
-        data={data}
+        month={activityMonth}
+        revision={data}
         history={commands.history}
-        monthControl={monthControl}
+        monthControl={<MonthControl month={activityMonth} onMonth={setActivityMonth} />}
         openEditor={openEditor}
         initialFilter={activityFilter}
         onImport={() => navigate("import")}
@@ -275,7 +280,7 @@ export default function FinanceApp({
           key={modal.type}
           modal={modal}
           data={data}
-          month={month}
+          month={page === "activity" ? activityMonth : month}
           busy={busy}
           error={editorError}
           loadHistory={commands.history}

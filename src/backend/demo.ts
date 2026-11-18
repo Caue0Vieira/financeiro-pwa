@@ -203,7 +203,8 @@ export function createDemoService(): FinanceService {
             account = { id: crypto.randomUUID(), name: bank };
             accounts.push(account);
           }
-          put(cards, { ...previous, id: id ?? crypto.randomUUID(), name, dueDay, closingDay, accountId: account?.id });
+          const design = action.card.design === undefined ? previous?.design : action.card.design ?? undefined;
+          put(cards, { ...previous, id: id ?? crypto.randomUUID(), name, dueDay, closingDay, design, accountId: account?.id });
           return;
         }
         case 'archiveCard': {

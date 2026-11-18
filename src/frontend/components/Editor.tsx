@@ -10,7 +10,8 @@ import type {
 } from "../../contracts";
 import { addDays, invoiceDates, todayInSaoPaulo } from "../../date";
 import { Icon } from "./common";
-import { BankIcon, bankSuggestions } from "./BankIcon";
+import { BankIcon, bankSuggestions, findBank } from "./BankIcon";
+import { CardModelPicker } from "./HomeCardArt";
 import { Field } from "./Field";
 import { Overlay } from "./Overlay";
 import { Select } from "./Select";
@@ -62,6 +63,8 @@ export default function Editor({
   );
   const [bankName, setBankName] = useState(currentBank ?? "");
   const [cardName, setCardName] = useState(type === "card" && item?.name !== currentBank ? (item?.name ?? "") : "");
+  const [design, setDesign] = useState<string | null>(type === "card" ? (item?.design ?? null) : null);
+  const designBank = type === "card" && linkedCard ? findBank(bankName) : undefined;
   const bankOptionsId = useId();
   const [description, setDescription] = useState(type === "entry" ? (item?.description ?? "") : "");
   const [category, setCategory] = useState(type === "entry" ? (item?.category ?? "") : "");
@@ -193,6 +196,8 @@ export default function Editor({
           bank: linkedCard ? bankName.trim() : undefined,
           dueDay: Number(read(f, "dueDay")) || null,
           closingDay: Number(read(f, "closingDay")) || null,
+          // Only a recognised bank has models; a different bank or a standalone card resets it.
+          design: designBank && designBank.designs.some(({ id }) => id === design) ? design : null,
         },
       });
     else if (type === "recurrence") {
@@ -519,6 +524,12 @@ export default function Editor({
                   required
                   full
                 />
+              )}
+              {designBank && designBank.designs.length > 1 && (
+                <div className="field full">
+                  Modelo do cartão
+                  <CardModelPicker bank={designBank} value={design} onChange={setDesign} />
+                </div>
               )}
               {item && (
                 <>

@@ -116,6 +116,9 @@ assert.deepEqual(
   (await db.query("select due_day, closing_day from public.cards where id=$1", [linkedCards[1].id])).rows[0],
   { due_day: 15, closing_day: 8 },
 );
+await db.query("update public.cards set design='prime' where id=$1", [linkedCards[1].id]);
+assert.equal((await db.query("select design from public.cards where id=$1", [linkedCards[1].id])).rows[0].design, 'prime');
+await assert.rejects(() => db.query("update public.cards set design='<script>' where id=$1", [linkedCards[1].id]));
 await db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-02-01','2026-02-06','2026-02-16')", [linkedCards[1].id]);
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,closing_on,due_on) values ($1,'2026-03-01','2026-03-20','2026-03-10')", [linkedCards[1].id]));
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month) values ($1,'2026-04-01')", [linkedCards[1].id]));
@@ -139,6 +142,7 @@ await assert.rejects(() => db.query("select public.save_card($1,'Cartão de outr
 await assert.rejects(() => db.query("insert into public.cards(name,account_id) values ('Banco de outro usuário',$1)", [account]));
 assert.deepEqual((await db.query("update public.cards set archived=true where id=$1 returning id", [dueCard])).rows, []);
 assert.equal((await db.query("select * from public.card_invoice_dates")).rows.length, 0);
+assert.deepEqual((await db.query("update public.cards set design='black' where id=$1 returning id", [linkedCards[1].id])).rows, []);
 await assert.rejects(() => db.query("insert into public.card_invoice_dates(card_id,month,due_on) values ($1,'2026-05-01','2026-05-10')", [linkedCards[1].id]));
 console.log('Migration, card links, owner isolation, installment, import, and settlement invariants passed.');
 await db.close();

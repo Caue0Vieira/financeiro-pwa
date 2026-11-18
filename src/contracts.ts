@@ -27,6 +27,8 @@ export interface Card {
   dueDay: number | null;
   /** Day the invoice closes; repeats every month like dueDay. */
   closingDay: number | null;
+  /** Card model of the bank (e.g. 'prime'); missing means the standard card. */
+  design?: string;
   accountId?: string;
   archived?: boolean;
 }
@@ -104,7 +106,7 @@ export type Action =
   | { type: 'saveEntry'; entry: Omit<Entry, 'id' | 'source'> & { id?: string } }
   | { type: 'deleteEntry'; id: string }
   | { type: 'saveAccount'; account: Omit<Account, 'id'> & { id?: string } }
-  | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay' | 'closingDay'> & { id?: string; bank?: string } }
+  | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay' | 'closingDay'> & { id?: string; bank?: string; design?: string | null } }
   | { type: 'archiveCard'; id: string }
   | { type: 'saveInvestment'; investment: Omit<Investment, 'id'> & { id?: string } }
   | { type: 'deleteInvestment'; id: string }

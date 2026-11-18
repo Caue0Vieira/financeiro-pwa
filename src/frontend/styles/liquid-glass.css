@@ -378,6 +378,13 @@
     inset 0 0 0 1px #ffffff2e,
     0 22px 38px -16px color-mix(in srgb, var(--card-to) 75%, transparent);
 }
+/* Premium models (Prime, Black, Ultravioleta…): dark face with a fine diagonal line in the bank colour. */
+:root[data-theme] .home-card-art[data-bank][data-detail] {
+  background:
+    linear-gradient(118deg, transparent 61%, color-mix(in srgb, var(--card-detail) 85%, transparent) 61.4% 62.6%, transparent 63%),
+    radial-gradient(120% 80% at 88% -6%, #ffffff2e, transparent 55%),
+    linear-gradient(150deg, var(--card-from), var(--card-to));
+}
 /* Cards behind the front one peek out above it, like a wallet, away from the balance text. */
 :root[data-theme] .home-card-back {
   translate: 4px -12px;
@@ -535,6 +542,45 @@
   filter: saturate(.72) brightness(.92);
   box-shadow: inset 0 1px 0 #ffffff2e;
 }
+
+/* ——— Card model picker (card editor) ——— */
+.card-models { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.card-model {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 6px 7px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.card-model:hover { background: var(--lg-wash); color: var(--text); }
+.card-model[aria-checked="true"] { background: var(--lg-pill-bg); box-shadow: var(--lg-pill-shadow); color: var(--text); }
+.card-model-face {
+  position: relative;
+  display: block;
+  width: 76px;
+  aspect-ratio: 1.586;
+  border-radius: 8px;
+  background:
+    radial-gradient(120% 80% at 88% -6%, #ffffff40, transparent 55%),
+    linear-gradient(150deg, var(--card-from), var(--card-to));
+  box-shadow: inset 0 1px 0 #ffffff59, inset 0 0 0 1px #ffffff26, 0 6px 14px -8px #00000080;
+}
+.card-model-face[data-detail] {
+  background:
+    linear-gradient(118deg, transparent 61%, var(--card-detail) 61.5% 63.5%, transparent 64%),
+    radial-gradient(120% 80% at 88% -6%, #ffffff2e, transparent 55%),
+    linear-gradient(150deg, var(--card-from), var(--card-to));
+}
+.card-model-face img { position: absolute; top: 5px; right: 5px; width: 15px; height: 15px; border-radius: 4px; }
+.card-model[aria-checked="true"] .card-model-face { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ——— Appearance settings (Perfil) ——— */
 .appearance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

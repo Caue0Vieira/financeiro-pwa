@@ -219,6 +219,11 @@ export function createSupabaseService(
           // PGRST202: the invoice_dates migration (closing day) is not applied yet.
           if (error?.code === "PGRST202") ({ error } = await db.rpc("save_card", card));
           fail(error);
+          if (id && action.card.design !== undefined) {
+            const saved = await db.from("cards").update({ design: action.card.design }).eq("id", id);
+            // PGRST204: the card_design migration is not applied yet; keep the standard model.
+            if (saved.error?.code !== "PGRST204") fail(saved.error);
+          }
           break;
         }
         case "archiveCard": {
@@ -526,6 +531,7 @@ export function createSupabaseService(
           name: x.name,
           dueDay: x.due_day,
           closingDay: x.closing_day ?? null,
+          design: x.design ?? undefined,
           accountId: x.account_id ?? undefined,
           archived: x.archived === true,
         })),

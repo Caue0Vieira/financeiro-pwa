@@ -1,6 +1,8 @@
+import { motion } from "motion/react";
 import { useId, useRef, useState, type ReactNode } from "react";
 import type { Dashboard, FinanceService } from "../../contracts";
 import { HeaderMenu, PageHeading } from "../components/common";
+import { iosSpring } from "../motion/liquid";
 import type { OpenEditor } from "../types";
 import Analytics from "./Analytics";
 import Budget from "./Budget";
@@ -47,7 +49,7 @@ export default function Planning({
   return (
     <>
       <PageHeading
-        title="Análise e Orçamento"
+        title="Orçamento e Análise"
         action={
           <HeaderMenu icon="calendar" label="Selecionar mês">
             {monthControl}
@@ -91,6 +93,9 @@ export default function Planning({
             onClick={() => selectTab(tab)}
           >
             {label}
+            {selected === tab && (
+              <motion.span className="planning-tab-indicator" layoutId={`${id}-tab-indicator`} transition={iosSpring} aria-hidden="true" />
+            )}
           </button>
         ))}
       </div>

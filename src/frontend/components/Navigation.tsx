@@ -8,7 +8,7 @@ import { Avatar, Brand, Icon, type IconName } from "./common";
 export const workspace = [
   { id: "home", label: "Visão geral", icon: "home" },
   { id: "activity", label: "Transações", icon: "activity" },
-  { id: "analytics", label: "Análise e Orçamento", icon: "analytics" },
+  { id: "analytics", label: "Orçamento e Análise", icon: "budget" },
   { id: "cards", label: "Cartões", icon: "card" },
   { id: "commitments", label: "Compromissos", icon: "receipt" },
   { id: "investments", label: "Investimentos", icon: "chart" },
@@ -66,7 +66,7 @@ export function Sidebar({
 
 const mobileLinks = [
   { id: "home", label: "Início", icon: "house" },
-  { id: "analytics", label: "Análise", icon: "analytics" },
+  { id: "analytics", label: "Orçamento", icon: "budget" },
   { id: "goals", label: "Metas", icon: "heart" },
   { id: "profile", label: "Perfil", icon: "user" },
 ] as const;

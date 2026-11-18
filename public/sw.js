@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financeiro-static-v9';
+const CACHE_NAME = 'financeiro-static-v10';
 const OFFLINE_PATH = '/offline.html';
 const STATIC_PATHS = new Set([
   OFFLINE_PATH,
@@ -42,7 +42,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (!STATIC_PATHS.has(url.pathname) && !url.pathname.startsWith('/assets/')) return;
+  const isStatic = STATIC_PATHS.has(url.pathname)
+    || url.pathname.startsWith('/assets/')
+    || url.pathname.startsWith('/icons/')
+    || /^\/manifest(-[a-z]+)?\.webmanifest$/.test(url.pathname);
+  if (!isStatic) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);

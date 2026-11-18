@@ -9,7 +9,10 @@ import './frontend/styles/components/fields.css';
 import './frontend/styles/components/dialog.css';
 import './frontend/styles/components/notifications.css';
 import { ThemeProvider } from './frontend/theme/ThemeProvider';
+import { applyAppIcon, readAppIcon } from './frontend/theme/appIcon';
 import App from './App';
+
+applyAppIcon(readAppIcon());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

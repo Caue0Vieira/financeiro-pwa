@@ -14,7 +14,10 @@ export function ThemeToggle() {
       aria-checked={dark}
       title={dark ? "Ativar tema claro" : "Ativar tema escuro"}
       data-scheme={resolvedTheme}
-      onClick={() => setTheme(dark ? "light" : "dark")}
+      onClick={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        setTheme(dark ? "light" : "dark", { x: box.left + box.width / 2, y: box.top + box.height / 2 });
+      }}
     >
       <span className="theme-toggle-sun" aria-hidden="true"><Icon name="sun" size={18} /></span>
       <span className="theme-toggle-moon" aria-hidden="true"><Icon name="moon" size={18} /></span>

@@ -5,6 +5,7 @@ import { Field } from "../components/Field";
 import { ApiTiming } from "../components/ApiTiming";
 import { ProfilePhotoDialog } from "../components/ProfilePhotoDialog";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { AppIconPicker } from "../components/AppIconPicker";
 import type { FinanceCommands, Page } from "../types";
 import { dateLabel } from "../format";
 
@@ -194,6 +195,19 @@ export default function Profile({
                   </button>
                 </div>
               </form>
+            </ProfileSection>
+            <ProfileSection title="Aparência" icon="palette">
+              <div className="appearance-row">
+                <span>
+                  <strong>Tema</strong>
+                  <small>Claro ou escuro, ambos em vidro líquido.</small>
+                </span>
+                <span className="top-pill appearance-theme">
+                  <ThemeToggle />
+                </span>
+              </div>
+              <strong className="appearance-label">Ícone do app</strong>
+              <AppIconPicker onChange={(label) => showNotice(`Ícone ${label} aplicado.`)} />
             </ProfileSection>
             <ProfileSection title="Notificações" icon="bell">
               {invoiceReminders}

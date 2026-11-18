@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Nítido · Finanças pessoais",
+  "short_name": "Nítido",
+  "lang": "pt-BR",
+  "description": "Acompanhe suas despesas, parcelas e investimentos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#edf5f0",
+  "theme_color": "#edf5f0",
+  "icons": [
+    { "src": "/icons/safira/icon-192.png?v=4", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/safira/icon-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/safira/icon-maskable.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

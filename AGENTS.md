@@ -22,3 +22,8 @@ Aplicativo pessoal para acompanhar receitas, despesas, faturas, investimentos e 
 - [`src/imports/`](src/imports/) contém a leitura e a revisão de extratos CSV e OFX e de faturas CSV. Use dados fictícios ao testar importações.
 - [`public/`](public/) contém o manifesto, o service worker e a página offline. [`supabase/migrations/`](supabase/migrations/) contém o esquema e as políticas de acesso.
 - Consulte [`supabase/README.md`](supabase/README.md) para mudanças em autenticação, migrações ou armazenamento. O frontend usa somente a URL e a chave publicável do Supabase. Mantenha os valores locais em `.env.local`, conforme [`.env.example`](.env.example).
+
+## Git
+
+- Commit e push estão liberados após cada alteração, direto na branch principal (`master`), sem abrir PR.
+- Inclua no commit somente os arquivos da alteração feita; não misture outras mudanças pendentes do working tree.

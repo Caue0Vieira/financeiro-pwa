@@ -35,6 +35,7 @@ export function BankConnectionsPanel({
   const [items, setItems] = useState<BankConnection[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [itemId, setItemId] = useState("");
 
   const load = useCallback(async () => {
     if (connections) setItems(await connections.list());
@@ -109,7 +110,8 @@ export function BankConnectionsPanel({
       {loadFailed && <p role="alert" className="subtle">Não foi possível carregar as conexões bancárias.</p>}
       {items.length === 0 && !loadFailed && (
         <p className="subtle">
-          Conecte o seu banco pela Pluggy e as compras novas entram sozinhas, já na fatura certa do cartão.
+          Conecte o seu banco pelo Meu Pluggy (grátis para uso pessoal) e as compras novas entram sozinhas, já na
+          fatura certa do cartão.
         </p>
       )}
       {items.map((item) => (
@@ -151,8 +153,45 @@ export function BankConnectionsPanel({
           </div>
         </div>
       ))}
-      <button className="button secondary bank-connect" disabled={busy !== null} onClick={() => void connect()}>
-        <Icon name="bank" size={17} /> {busy === "connect" ? "Abrindo…" : "Conectar banco"}
+      <form
+        className="bank-link"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const id = itemId.trim();
+          void run("link", async () => {
+            const { inserted } = await connections.register(id);
+            setItemId("");
+            return `Conexão vinculada. ${imported(inserted)}`;
+          });
+        }}
+      >
+        <label className="field full">
+          Vincular conexão do Meu Pluggy
+          <input
+            value={itemId}
+            onChange={(event) => setItemId(event.target.value)}
+            placeholder="Cole o ID da conexão (Item ID)"
+            pattern="\s*[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*"
+            title="O ID tem o formato 00000000-0000-0000-0000-000000000000"
+            autoComplete="off"
+            spellCheck={false}
+            required
+          />
+        </label>
+        <button className="button" disabled={busy !== null}>{busy === "link" ? "Vinculando…" : "Vincular"}</button>
+      </form>
+      <details className="form-details bank-link-help">
+        <summary>Como pegar o ID no Meu Pluggy</summary>
+        <ol>
+          <li>Em meu.pluggy.ai, crie a conta e conecte o seu banco.</li>
+          <li>No painel da Pluggy, abra a sua aplicação e habilite o conector MeuPluggy, se ele não aparecer.</li>
+          <li>Crie uma conexão, escolha MeuPluggy, entre com a conta do Meu Pluggy e autorize.</li>
+          <li>Copie o ID da conexão (Item ID) e cole acima. Faça isso para cada banco.</li>
+        </ol>
+        <p className="subtle">Os dados atualizam sozinhos uma vez por dia pelo Meu Pluggy.</p>
+      </details>
+      <button className="text-button bank-connect-widget" disabled={busy !== null} onClick={() => void connect()}>
+        <Icon name="bank" size={15} /> {busy === "connect" ? "Abrindo…" : "Conectar direto pela Pluggy (plano pago)"}
       </button>
     </section>
   );

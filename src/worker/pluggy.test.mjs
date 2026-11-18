@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
-import { invoiceMonthFor, mapTransaction, purchasesAreNegative, saoPauloDate } from './mapping.ts';
+import { bankNameFor, invoiceMonthFor, mapTransaction, purchasesAreNegative, saoPauloDate } from './mapping.ts';
+
+test('Meu Pluggy connections take the bank name from their accounts', () => {
+  assert.equal(bankNameFor('Banco Inter', []), 'Banco Inter');
+  assert.equal(bankNameFor('MeuPluggy', [{ name: 'Conta Corrente' }, { name: 'Cartão', marketingName: 'Inter Prime' }]), 'Banco Inter');
+  assert.equal(bankNameFor('Meu Pluggy', [{ name: 'NU PAGAMENTOS S.A.' }]), 'Nubank');
+  assert.equal(bankNameFor('MeuPluggy', [{ name: 'Conta' }]), 'Meu Pluggy');
+});
 import { validSignature, validToken } from './pluggy.ts';
 
 test('the custom header token must match exactly and be long enough', () => {

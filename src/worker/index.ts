@@ -60,23 +60,34 @@ async function connectToken(services: Services, request: Request) {
   return json({ connectToken: await services.pluggy.connectToken(userId, itemId as string | undefined) });
 }
 
-/** Called by the app after Pluggy Connect succeeds: stores the item, then imports it. */
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Stores an item and imports it. Two origins: Pluggy Connect in the app (the item carries this
+ * user's clientUserId) or a connection made in the Pluggy Dashboard, as Meu Pluggy requires
+ * (no clientUserId; the id is pasted in the app). Pluggy only returns items of this
+ * application, and an item already linked to another user is refused below.
+ */
 async function registerItem(services: Services, request: Request) {
   const userId = await signedInUser(services, request);
   const { itemId } = await body(request);
-  if (typeof itemId !== "string" || !itemId) throw new HttpError(400, "Conexão inválida.");
-  const item = await services.pluggy.item(itemId);
-  // Only items created with this user's connect token may be attached to this user.
-  if (item.clientUserId !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
-  const { data: existing, error } = await services.db.from("pluggy_items").select("user_id").eq("item_id", itemId).maybeSingle();
+  if (typeof itemId !== "string" || !uuid.test(itemId.trim())) throw new HttpError(400, "ID de conexão inválido.");
+  const item = await services.pluggy.item(itemId.trim()).catch((error) => {
+    if (error instanceof PluggyError && (error.status === 404 || error.status === 400)) {
+      throw new HttpError(404, "Conexão não encontrada na sua aplicação da Pluggy.");
+    }
+    throw error;
+  });
+  if (item.clientUserId && item.clientUserId !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
+  const { data: existing, error } = await services.db.from("pluggy_items").select("user_id").eq("item_id", item.id).maybeSingle();
   if (error) throw error;
   if (existing && existing.user_id !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
   if (!existing) {
     const saved = await services.db.from("pluggy_items")
-      .insert({ user_id: userId, item_id: itemId, connector_name: item.connector.name, status: item.status ?? null });
+      .insert({ user_id: userId, item_id: item.id, connector_name: item.connector.name, status: item.status ?? null });
     if (saved.error) throw saved.error;
   }
-  return json(await syncItem(services.db, services.pluggy, userId, itemId, inferCategory));
+  return json(await syncItem(services.db, services.pluggy, userId, item.id, inferCategory));
 }
 
 /** "Sincronizar": asks the banks for fresh data (arrives by webhook) and imports what Pluggy has now. */
@@ -86,6 +97,7 @@ async function syncAll(services: Services, request: Request) {
   if (error) throw error;
   let inserted = 0;
   for (const { item_id } of data ?? []) {
+    // Meu Pluggy items refuse PATCH (they follow the original connection's daily sync); ignore.
     await services.pluggy.refreshItem(item_id).catch(() => undefined);
     inserted += (await syncItem(services.db, services.pluggy, userId, item_id, inferCategory)).inserted;
   }

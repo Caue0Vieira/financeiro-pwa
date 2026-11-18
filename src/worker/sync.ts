@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { dayOf, mapTransaction, purchasesAreNegative, type PluggyAccount } from "./mapping";
+import { bankNameFor, dayOf, mapTransaction, purchasesAreNegative, type PluggyAccount } from "./mapping";
 import type { Pluggy, PluggyItem } from "./pluggy";
 
 type Link = { pluggy_account_id: string; account_id: string | null; card_id: string | null };
@@ -27,7 +27,7 @@ async function linkAccounts(db: SupabaseClient, userId: string, item: PluggyItem
   const links = new Map((data as Link[]).map((link) => [link.pluggy_account_id, link]));
   for (const account of accounts) {
     if (links.has(account.id)) continue;
-    const bankId = await bankAccount(db, userId, item.connector.name);
+    const bankId = await bankAccount(db, userId, bankNameFor(item.connector.name, accounts));
     let link: Link;
     if (account.type === "CREDIT") {
       const card = await db.from("cards").insert({
@@ -109,7 +109,11 @@ export async function syncItem(
   }
 
   const updated = await db.from("pluggy_items")
-    .update({ last_synced_at: new Date().toISOString(), status: item.status ?? null })
+    .update({
+      last_synced_at: new Date().toISOString(),
+      status: item.status ?? null,
+      connector_name: bankNameFor(item.connector.name, accounts),
+    })
     .eq("item_id", itemId).eq("user_id", userId);
   fail(updated.error);
   return { inserted };

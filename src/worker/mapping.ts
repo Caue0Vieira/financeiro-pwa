@@ -63,7 +63,38 @@ export function invoiceMonthFor(date: string, closingDay: number | null, dueDay:
   return monthStart(year, month - 1 + shift);
 }
 
-export const dayOf = (iso?: string | null) => (iso ? Number(saoPauloDate(iso).slice(8, 10)) || null : null);
+/** Banks as the app names them (src/frontend/components/BankIcon.tsx), found in account names. */
+const knownBanks: [RegExp, string][] = [
+  [/\binter\b/i, "Banco Inter"],
+  [/\bnu(bank)?\b|nu pagamentos/i, "Nubank"],
+  [/\bita[uú]\b/i, "Itaú"],
+  [/santander/i, "Santander"],
+  [/banco do brasil|\bbb\b|ourocard/i, "Banco do Brasil"],
+  [/bradesco/i, "Bradesco"],
+  [/\bcaixa\b/i, "Caixa"],
+  [/\bc6\b/i, "C6 Bank"],
+  [/\bbtg\b/i, "BTG Pactual"],
+  [/sicoob/i, "Sicoob"],
+  [/sicredi/i, "Sicredi"],
+  [/\bneon\b/i, "Neon"],
+  [/mercado ?pago/i, "Mercado Pago"],
+];
+
+/**
+ * The bank behind an item. Meu Pluggy connections report the connector as "MeuPluggy", so the
+ * bank is recognised from the accounts' names instead (e.g. "Inter Prime" → Banco Inter).
+ */
+export function bankNameFor(connectorName: string, accounts: readonly Pick<PluggyAccount, "name" | "marketingName">[]) {
+  if (!/meu\s*pluggy/i.test(connectorName)) return connectorName;
+  for (const account of accounts) {
+    const text = `${account.marketingName ?? ""} ${account.name}`;
+    const bank = knownBanks.find(([pattern]) => pattern.test(text))?.[1];
+    if (bank) return bank;
+  }
+  return "Meu Pluggy";
+}
+
+export const dayOf =(iso?: string | null) => (iso ? Number(saoPauloDate(iso).slice(8, 10)) || null : null);
 
 const isCardPayment = (tx: PluggyTransaction) =>
   /credit card payment/i.test(tx.category ?? "") ||

@@ -417,4 +417,9 @@
 .bank-connection-actions .subtle { font-size: .78rem; }
 .bank-connections .text-button { display: inline-flex; align-items: center; gap: 5px; }
 .bank-connections .danger-text { color: var(--danger); }
-.bank-connect { width: 100%; justify-content: center; margin: 8px 0 6px; }
+.bank-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin-top: 10px; }
+.bank-link .field input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+.bank-link-help { margin-top: 8px; }
+.bank-link-help ol { margin: 8px 0; padding-left: 18px; display: grid; gap: 4px; font-size: .84rem; color: var(--muted); }
+.bank-connect-widget { margin: 6px 0 4px; font-size: .8rem; color: var(--muted); }
+@media (max-width: 480px) { .bank-link { grid-template-columns: 1fr; } }

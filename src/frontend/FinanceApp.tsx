@@ -5,7 +5,7 @@ import CommitmentEditor from "./components/CommitmentEditor";
 import Editor from "./components/Editor";
 import InvoiceAlerts, { useInvoiceAlerts } from "./components/InvoiceAlerts";
 import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./components/common";
-import { account, MobileNav, Sidebar, workspace } from "./components/Navigation";
+import { MobileNav, Sidebar } from "./components/Navigation";
 import Activity, { type ActivityFilter } from "./pages/Activity";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
@@ -14,6 +14,7 @@ import Cards from "./pages/Cards";
 import Commitments from "./pages/Commitments";
 import Goals from "./pages/Goals";
 import Investments from "./pages/Investments";
+import More from "./pages/More";
 import Profile from "./pages/Profile";
 import type { EditModal, FinanceCommands, Page } from "./types";
 import "./styles/app.css";
@@ -196,27 +197,7 @@ export default function FinanceApp({
         navigate={navigate}
       />
     ),
-    more: (
-      <>
-        <PageHeading title="Mais" action={monthControl} />
-        <div className="panel more-links">
-          {[
-            ...workspace.filter(
-              ({ id }) => id === "activity" || id === "cards" || id === "commitments" || id === "investments",
-            ),
-            ...account,
-          ].map(({ id, label, icon }) => (
-            <button key={id} onClick={() => navigate(id)}>
-              <span className="tile-icon tone-mint">
-                <Icon name={icon} />
-              </span>
-              <strong>{label}</strong>
-              <Icon name="chevronRight" size={18} />
-            </button>
-          ))}
-        </div>
-      </>
-    ),
+    more: <More monthControl={monthControl} navigate={navigate} />,
   };
 
   return (

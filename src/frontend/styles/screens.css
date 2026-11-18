@@ -1,6 +1,70 @@
 .mobile-back { display: none; }
 .page-heading-title { display: flex; align-items: center; min-width: 0; gap: 5px; }
 .screen-stack { display: grid; gap: 16px; align-content: start; }
+.more-page { max-width: 740px; }
+.more-page .page-heading > .month-switch { margin-left: 0; }
+.more-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.more-shortcut {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: space-between;
+  justify-items: start;
+  min-height: 120px;
+  gap: 13px 4px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: start;
+}
+.more-shortcut .tile-icon { width: 36px; height: 36px; }
+.more-shortcut > svg { color: var(--muted); align-self: center; }
+.more-shortcut-label { display: grid; grid-column: 1 / -1; gap: 3px; overflow-wrap: anywhere; }
+.more-shortcut-label strong { font-size: .9rem; line-height: 1.15; }
+.more-shortcut-label small { color: var(--muted); font-size: .75rem; line-height: 1.3; }
+.more-shortcut:first-child {
+  background: var(--feature-start);
+  border-color: var(--feature-start);
+  color: #fff;
+}
+.more-shortcut:first-child .tile-icon { background: #ffffff20; color: #defff2; }
+.more-shortcut:first-child small, .more-shortcut:first-child > svg { color: #cbebe1; }
+.more-account {
+  margin-top: 13px;
+  padding-inline: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.more-account button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 46px;
+  padding: 6px 2px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  font-size: .86rem;
+  font-weight: 680;
+}
+.more-account button + button { border-top: 1px solid var(--line); }
+.more-account button svg:first-child { color: var(--accent); }
+.more-account button svg:last-child { color: var(--muted); }
+@media (hover: hover) {
+  .more-shortcut:hover { border-color: var(--accent); }
+  .more-shortcut:hover > svg, .more-account button:hover { color: var(--accent); }
+  .more-shortcut:first-child:hover > svg { color: #fff; }
+}
+.more-shortcut:active, .more-account button:active { opacity: .84; }
+.more-shortcut:focus-visible, .more-account button:focus-visible { outline-offset: 2px; }
 .commitments, [data-page="commitments"] .page-heading { max-width: 850px; }
 .commitments-summary {
   display: flex;

@@ -1,6 +1,8 @@
+import { motion } from "motion/react";
 import type { Profile } from "../../contracts";
 import { brandName } from "../brand";
 import type { Page } from "../types";
+import { iosSpring } from "../motion/liquid";
 import { Avatar, Brand, Icon, type IconName } from "./common";
 
 export const workspace = [
@@ -28,6 +30,9 @@ export function Sidebar({
 }: NavigationProps & { profile: Profile; preview: boolean }) {
   const render = ({ id, label, icon }: { id: Page; label: string; icon: IconName }) => (
     <button key={id} aria-current={page === id ? "page" : undefined} onClick={() => navigate(id)}>
+      {page === id && (
+        <motion.span className="nav-active-pill" layoutId="sidebar-active" transition={iosSpring} aria-hidden="true" />
+      )}
       <Icon name={icon} />
       <span>{label}</span>
     </button>

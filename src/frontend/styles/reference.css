@@ -112,19 +112,6 @@
 
 .profile-budget { background: linear-gradient(150deg, #00302f, #015a44 59%, #037b4f 100%); }
 .profile-budget-ring > strong { background: #075743; }
-:root[data-theme="dark"] .budget-card { background: linear-gradient(150deg, #0B2B26 8%, #163832 60%, #235347); border-color: #235347; }
-:root[data-theme="dark"] .profile-budget { background: linear-gradient(150deg, #0B2B26, #163832 59%, #235347 100%); border-color: #235347; }
-:root[data-theme="dark"] .profile-budget-ring > strong { background: #163832; }
-:root[data-theme="dark"] .feature-card { border-color: #235347; background: radial-gradient(ellipse at 100% 0, #8EB69B24, transparent 75%), linear-gradient(115deg, #0B2B26, #235347); color: #DAF1DE; }
-:root[data-theme="dark"] .reference-investment-cta { background: linear-gradient(160deg, #235347, #163832); color: #DAF1DE; }
-:root[data-theme="dark"] .spend-pop { background: #235347; color: #DAF1DE; }
-:root[data-theme="dark"] .spend-pop::after { border-top-color: #235347; }
-:root[data-theme="dark"] [data-page="activity"] .home-entry-row .transaction-icon:not([data-tone]),
-:root[data-theme="dark"] [data-page="analytics"] .transaction-icon:not([data-category]),
-:root[data-theme="dark"] [data-page="investments"] .portfolio-list .transaction-icon:not([data-portfolio-tone]) {
-  background: #163832;
-  color: #DAF1DE;
-}
 .profile-reminders { padding-left: 18px; color: var(--page-muted); font-size: .84rem; }
 [data-page="profile"] .profile-section + .profile-section, [data-page="profile"] .profile-link, [data-page="profile"] .profile-link + .profile-section { border-color: var(--ref-line); }
 

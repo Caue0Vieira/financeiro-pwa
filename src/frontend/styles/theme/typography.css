@@ -1,5 +1,6 @@
 @import "@fontsource-variable/dm-sans/wght.css";
 @import "@fontsource-variable/bricolage-grotesque/wght.css";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
 
 :root {
   --font-body: "DM Sans Variable", sans-serif;

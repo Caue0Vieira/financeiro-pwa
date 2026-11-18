@@ -176,31 +176,6 @@
 .invoice-alerts .card-row { padding-inline: 0; }
 .invoice-alerts .card-row:hover { background: var(--surface); }
 
-:root[data-theme="dark"] .home-balance {
-  border-color: #235347;
-  background: linear-gradient(135deg, #0B2B26 0%, #163832 62%, #235347 100%);
-  color: #DAF1DE;
-  box-shadow: inset 0 1px 0 #8EB69B24;
-}
-:root[data-theme="dark"] .home-balance-label { color: #8EB69B; }
-:root[data-theme="dark"] .home-balance-amount > button { color: #DAF1DE; }
-:root[data-theme="dark"] .home-confirmed { color: #DAF1DE; }
-:root[data-theme="dark"] .home-confirmed strong,
-:root[data-theme="dark"] .home-confirmed svg { color: #8EB69B; }
-:root[data-theme="dark"] .home-card-art {
-  border-color: #8EB69B33;
-  background:
-    radial-gradient(ellipse at 12% 8%, #8EB69B2e 2%, transparent 66%),
-    linear-gradient(160deg, #235347, #163832 58%, #0B2B26);
-  box-shadow: inset 0 1px 1px #DAF1DE1f, 0 8px 18px #051F2088;
-}
-:root[data-theme="dark"] .home-card-chip { background: #8EB69B38; }
-:root[data-theme="dark"] .home-card-signature b { color: #DAF1DE; }
-:root[data-theme="dark"] .home-entry-row .transaction-icon:not([data-tone]) {
-  background: #163832;
-  color: #DAF1DE;
-}
-
 @media (hover: hover) and (pointer: fine) {
   .transaction.home-entry-row:hover, .home-quick-actions button:hover { background: var(--home-action-mint); }
 }

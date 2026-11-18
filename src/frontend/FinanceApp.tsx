@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { MotionConfig } from "motion/react";
 import type { Action, Dashboard as DashboardData } from "../contracts";
 import CardPicker from "./components/CardPicker";
 import CommitmentEditor from "./components/CommitmentEditor";
@@ -21,6 +22,8 @@ import "./styles/app.css";
 import "./styles/screens.css";
 import "./styles/dashboard.css";
 import "./styles/reference.css";
+import "./styles/liquid-glass.css";
+import { useEntrance, useSpotlight } from "./motion/liquid";
 
 type Props = {
   data: DashboardData;
@@ -55,9 +58,12 @@ export default function FinanceApp({
   const [editorError, setEditorError] = useState("");
   const [busy, setBusy] = useState(false);
   const main = useRef<HTMLElement>(null);
+  const shell = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
   const month = data.month;
   const invoiceAlerts = useInvoiceAlerts(data, commands.dashboard);
+  useSpotlight(shell);
+  useEntrance(shell);
 
   useEffect(() => {
     if (!moveFocus.current) return;
@@ -205,112 +211,114 @@ export default function FinanceApp({
   };
 
   return (
-    <div className="app-shell" data-page={page}>
-      <a className="skip-link" href="#conteudo">
-        Ir para o conteúdo
-      </a>
-      <Sidebar page={page} navigate={navigate} profile={data.profile} preview={preview} />
-      <main className="main" id="conteudo" ref={main} tabIndex={-1}>
-        <div className="topbar">
-          {preview && (
-            <span className="demo-label">
-              <i />
-              Demonstração
-            </span>
-          )}
-          <div className="top-actions">
-            <button className="button secondary top-import" onClick={() => navigate("import")}>
-              <Icon name="upload" size={17} /> Importar
-            </button>
-            {page !== "commitments" && (
-              <button className="button desktop-add" onClick={add}>
-                <Icon name="plus" size={18} /> Novo lançamento
-              </button>
-            )}
-            <div className="top-pill" role="group" aria-label="Tema e notificações">
-              <ThemeToggle />
-              <button
-                type="button"
-                className="top-pill-btn top-bell"
-                aria-label={
-                  invoiceAlerts.length
-                    ? `Notificações (${invoiceAlerts.length} faturas a pagar)`
-                    : "Notificações e compromissos"
-                }
-                onClick={() => navigate("commitments")}
-              >
-                <Icon name="bell" size={18} />
-                {invoiceAlerts.length > 0 && <span className="top-bell-dot" aria-hidden="true" />}
-              </button>
-            </div>
-            <button className="top-user-pill" onClick={() => navigate("profile")} aria-label="Abrir perfil">
-              <Avatar profile={data.profile} />
-              <span className="top-user-meta">
-                <strong>{data.profile.name || "Sua conta"}</strong>
-                <small>{email || (preview ? "Demonstração" : "Minha conta")}</small>
+    <MotionConfig reducedMotion="user">
+      <div className="app-shell" data-page={page} ref={shell}>
+        <a className="skip-link" href="#conteudo">
+          Ir para o conteúdo
+        </a>
+        <Sidebar page={page} navigate={navigate} profile={data.profile} preview={preview} />
+        <main className="main" id="conteudo" ref={main} tabIndex={-1}>
+          <div className="topbar">
+            {preview && (
+              <span className="demo-label">
+                <i />
+                Demonstração
               </span>
-              <Icon name="chevronDown" size={16} />
-            </button>
+            )}
+            <div className="top-actions">
+              <button className="button secondary top-import" onClick={() => navigate("import")}>
+                <Icon name="upload" size={17} /> Importar
+              </button>
+              {page !== "commitments" && (
+                <button className="button desktop-add" onClick={add}>
+                  <Icon name="plus" size={18} /> Novo lançamento
+                </button>
+              )}
+              <div className="top-pill" role="group" aria-label="Tema e notificações">
+                <ThemeToggle />
+                <button
+                  type="button"
+                  className="top-pill-btn top-bell"
+                  aria-label={
+                    invoiceAlerts.length
+                      ? `Notificações (${invoiceAlerts.length} faturas a pagar)`
+                      : "Notificações e compromissos"
+                  }
+                  onClick={() => navigate("commitments")}
+                >
+                  <Icon name="bell" size={18} />
+                  {invoiceAlerts.length > 0 && <span className="top-bell-dot" aria-hidden="true" />}
+                </button>
+              </div>
+              <button className="top-user-pill" onClick={() => navigate("profile")} aria-label="Abrir perfil">
+                <Avatar profile={data.profile} />
+                <span className="top-user-meta">
+                  <strong>{data.profile.name || "Sua conta"}</strong>
+                  <small>{email || (preview ? "Demonstração" : "Minha conta")}</small>
+                </span>
+                <Icon name="chevronDown" size={16} />
+              </button>
+            </div>
           </div>
-        </div>
-        <div role="status">
-          {notice?.kind === "success" && (
-            <div className="success-toast" data-exiting={notice.exiting}>
-              <span>{notice.message}</span>
+          <div role="status">
+            {notice?.kind === "success" && (
+              <div className="success-toast" data-exiting={notice.exiting}>
+                <span>{notice.message}</span>
+              </div>
+            )}
+          </div>
+          {notice?.kind === "error" && (
+            <div className="notice">
+              <span role="alert">{notice.message}</span>
+              <button className="icon-button" onClick={() => setNotice(undefined)} aria-label="Dispensar aviso">
+                <Icon name="close" size={17} />
+              </button>
             </div>
           )}
-        </div>
-        {notice?.kind === "error" && (
-          <div className="notice">
-            <span role="alert">{notice.message}</span>
-            <button className="icon-button" onClick={() => setNotice(undefined)} aria-label="Dispensar aviso">
-              <Icon name="close" size={17} />
-            </button>
-          </div>
+          <BackNavigation.Provider value={page === "home" ? null : goBack}>
+            {pages[page]}
+          </BackNavigation.Provider>
+        </main>
+        <MobileNav page={page} navigate={navigate} onAdd={add} />
+        {modal?.type === "card-picker" ? (
+          <CardPicker
+            accounts={data.accounts}
+            busy={busy}
+            error={editorError}
+            close={() => { if (!busy) setModal(undefined); }}
+            openEditor={openEditor}
+            save={mutate}
+          />
+        ) : modal?.type === "commitment" ? (
+          <CommitmentEditor
+            cards={activeCards}
+            month={month}
+            busy={busy}
+            error={editorError}
+            close={() => { if (!busy) setModal(undefined); }}
+            openCards={() => {
+              setModal(undefined);
+              navigate("cards");
+            }}
+            save={mutate}
+          />
+        ) : modal && (
+          <Editor
+            key={modal.type}
+            modal={modal}
+            data={data}
+            month={page === "activity" ? activityMonth : month}
+            busy={busy}
+            error={editorError}
+            loadHistory={commands.history}
+            close={() => {
+              if (!busy) setModal(undefined);
+            }}
+            mutate={mutate}
+            changeModal={openEditor}
+          />
         )}
-        <BackNavigation.Provider value={page === "home" ? null : goBack}>
-          {pages[page]}
-        </BackNavigation.Provider>
-      </main>
-      <MobileNav page={page} navigate={navigate} onAdd={add} />
-      {modal?.type === "card-picker" ? (
-        <CardPicker
-          accounts={data.accounts}
-          busy={busy}
-          error={editorError}
-          close={() => { if (!busy) setModal(undefined); }}
-          openEditor={openEditor}
-          save={mutate}
-        />
-      ) : modal?.type === "commitment" ? (
-        <CommitmentEditor
-          cards={activeCards}
-          month={month}
-          busy={busy}
-          error={editorError}
-          close={() => { if (!busy) setModal(undefined); }}
-          openCards={() => {
-            setModal(undefined);
-            navigate("cards");
-          }}
-          save={mutate}
-        />
-      ) : modal && (
-        <Editor
-          key={modal.type}
-          modal={modal}
-          data={data}
-          month={page === "activity" ? activityMonth : month}
-          busy={busy}
-          error={editorError}
-          loadHistory={commands.history}
-          close={() => {
-            if (!busy) setModal(undefined);
-          }}
-          mutate={mutate}
-          changeModal={openEditor}
-        />
-      )}
-    </div>
+      </div>
+    </MotionConfig>
   );
 }

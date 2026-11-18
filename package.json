@@ -15,8 +15,12 @@
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
     "@fontsource-variable/dm-sans": "5.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@gsap/react": "2.1.2",
     "@supabase/supabase-js": "2.117.2",
+    "gsap": "3.15.1",
     "lucide-react": "1.55.0",
+    "motion": "14.14.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

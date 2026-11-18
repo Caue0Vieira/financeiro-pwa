@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Dashboard as DashboardData } from "../../contracts";
 import { Avatar, Entries, EntryRow, Icon, type IconName } from "../components/common";
 import { HomeCardArt } from "../components/HomeCardArt";
@@ -40,6 +40,7 @@ export default function Dashboard({
     { icon: "more", label: "Mais", action: () => navigate("more") },
   ];
   const confirmedBalance = data.received - data.expenses;
+  const balanceText = balanceVisible ? money(data.projectedSurplus) : "••••••";
   const today = todayInSaoPaulo();
   const yesterday = addDays(today, -1);
 
@@ -67,7 +68,7 @@ export default function Dashboard({
             <div className="home-balance-content">
               <span className="home-balance-label">Saldo previsto</span>
               <div className="home-balance-amount">
-                <strong>{balanceVisible ? money(data.projectedSurplus) : "••••••"}</strong>
+                <strong style={{ "--amount-chars": balanceText.length } as CSSProperties}>{balanceText}</strong>
                 <button
                   type="button"
                   onClick={onToggleBalance}

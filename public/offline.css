@@ -1,8 +1,8 @@
 :root {
   color-scheme: light dark;
   font: 16px system-ui, sans-serif;
-  background: #f5f4ef;
-  color: #242a26;
+  background: #edf5f0;
+  color: #142b25;
 }
 body {
   display: grid;
@@ -15,8 +15,8 @@ body {
 main { max-width: 24rem; }
 h1 { font-size: 2rem; letter-spacing: -0.04em; }
 p { line-height: 1.55; }
-a { color: #305747; }
+a { color: #096a54; }
 @media (prefers-color-scheme: dark) {
-  :root { background: #151916; color: #e7ebe5; }
-  a { color: #b0c9b6; }
+  :root { background: #10211d; color: #edf8f0; }
+  a { color: #8ce9cd; }
 }

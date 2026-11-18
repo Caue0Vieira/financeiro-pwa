@@ -21,7 +21,7 @@ export interface Entry {
 }
 
 export interface Account { id: string; name: string }
-export interface Card { id: string; name: string; dueDay: number }
+export interface Card { id: string; name: string; dueDay: number | null; accountId?: string }
 export interface Investment {
   id: string;
   institution: string;
@@ -43,13 +43,23 @@ export interface Recurrence {
 export interface Invoice {
   cardId: string;
   month: string;
-  dueDate: string;
+  dueDate: string | null;
   total: number;
   paid: number;
 }
 export interface Coverage { month: string; from: string; to: string }
 export interface Profile { name: string; avatarUrl?: string }
 export interface Session { email: string }
+export interface SavingsTarget { id: string; name: string; amount: number; saved: number }
+export interface Valuation { date: string; value: number }
+export type AnalysisPeriod = 'week' | 'month' | 'year';
+export interface SpendingAnalysis {
+  range: { start: string; end: string };
+  total: number;
+  previous: number;
+  points: { date: string; amount: number }[];
+  categories: { name: string; amount: number }[];
+}
 
 export interface Dashboard {
   month: string;
@@ -60,6 +70,9 @@ export interface Dashboard {
   toPay: number;
   projectedSurplus: number;
   goal: number;
+  budget: number;
+  targets: SavingsTarget[];
+  valuations: Valuation[];
   saved: number;
   cashIn: number;
   cashOut: number;
@@ -80,13 +93,17 @@ export type Action =
   | { type: 'saveEntry'; entry: Omit<Entry, 'id' | 'source'> & { id?: string } }
   | { type: 'deleteEntry'; id: string }
   | { type: 'saveAccount'; account: Omit<Account, 'id'> & { id?: string } }
-  | { type: 'saveCard'; card: Omit<Card, 'id'> & { id?: string } }
+  | { type: 'saveCard'; card: Pick<Card, 'name' | 'dueDay'> & { id?: string; bank?: string } }
   | { type: 'saveInvestment'; investment: Omit<Investment, 'id'> & { id?: string } }
   | { type: 'deleteInvestment'; id: string }
   | { type: 'saveRecurrence'; recurrence: Omit<Recurrence, 'id'> & { id?: string }; effectiveMonth?: string }
   | { type: 'endRecurrence'; id: string; endMonth: string }
   | { type: 'addInstallments'; cardId: string; description: string; category: string; total: number; count: number; firstMonth: string }
   | { type: 'saveGoal'; month: string; amount: number }
+  | { type: 'saveBudget'; month: string; amount: number }
+  | { type: 'saveTarget'; target: Pick<SavingsTarget, 'name' | 'amount'> & { id?: string } }
+  | { type: 'deleteTarget'; id: string }
+  | { type: 'contributeTarget'; id: string; amount: number }
   | { type: 'settleInvoice'; paymentId: string; cardId: string; month: string; amount: number };
 
 export interface ImportRow {
@@ -118,6 +135,7 @@ export interface FinanceService {
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   dashboard(month: string): Promise<Dashboard>;
+  analysis(date: string, period: AnalysisPeriod): Promise<SpendingAnalysis>;
   history(month: string, offset: number, limit: number): Promise<Entry[]>;
   mutate(action: Action): Promise<void>;
   confirmImport(payload: ImportPayload): Promise<ImportResult>;

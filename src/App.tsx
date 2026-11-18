@@ -1,15 +1,15 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { Dashboard, FinanceService, Session } from './contracts';
 import { currentMonth } from './date';
-import { createDemoService } from './data/demo';
-import { createSupabaseService } from './data/supabase';
-import FinanceApp, { Login } from './ui/FinanceApp';
-import './boot.css';
+import { configuredBackend, createDemoService } from './backend';
+import FinanceApp from './frontend/FinanceApp';
+import { Brand } from './frontend/components/common';
+import Login from './frontend/pages/Login';
+import Welcome from './frontend/pages/Welcome';
+import type { FinanceCommands } from './frontend/types';
 
-const ImportView = lazy(() => import('./imports/ImportView'));
-const url: string | undefined = import.meta.env.VITE_SUPABASE_URL;
-const key: string | undefined = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const backend = url && key ? createSupabaseService(url, key) : null;
+const ImportView = lazy(() => import('./frontend/pages/ImportView'));
+const backend = configuredBackend();
 const previewAllowed = import.meta.env.DEV || import.meta.env.MODE === 'demo';
 
 export default function App() {
@@ -21,6 +21,7 @@ export default function App() {
   const [month, setMonth] = useState(currentMonth);
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState('');
+  const [welcomeSeen, setWelcomeSeen] = useState(() => localStorage.getItem('finance-welcome-seen') === 'yes');
   const request = useRef(0);
   const service = demo ?? (session ? backend : null);
 
@@ -95,8 +96,12 @@ export default function App() {
   }
   if (!service) {
     if (!backend && !previewAllowed) {
-      return <Status title="Financeiro">O acesso será liberado quando a conta for configurada.</Status>;
+      return <Status>O acesso será liberado quando a conta for configurada.</Status>;
     }
+    if (!welcomeSeen) return <Welcome onContinue={() => {
+      localStorage.setItem('finance-welcome-seen', 'yes');
+      setWelcomeSeen(true);
+    }} />;
     return <Login
       onSignIn={async (email, password) => {
         if (!backend) throw new Error('Configure o Supabase para fazer login.');
@@ -111,21 +116,29 @@ export default function App() {
   }
   if (!data) {
     return (
-      <Status title="Financeiro">
+      <Status>
         {error || 'Carregando seu painel…'}
         {error && <button className="button" onClick={() => void refresh().catch(() => {})}>Tentar novamente</button>}
       </Status>
     );
   }
+  const commands: FinanceCommands = {
+    history: service.history,
+    mutate: service.mutate,
+    confirmImport: service.confirmImport,
+    saveProfile: service.saveProfile,
+    changePassword: service.changePassword,
+    dashboard: service.dashboard,
+    analysis: service.analysis,
+    refresh,
+  };
   return (
     <>
       {error && <div role="alert" className="connection-notice">{error}</div>}
       <FinanceApp
         data={data}
-        month={data.month}
         onMonth={(next) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(next)) setMonth(next); }}
-        service={service}
-        refresh={refresh}
+        commands={commands}
         preview={Boolean(demo)}
         email={session?.email ?? ''}
         onSignOut={async () => {
@@ -134,7 +147,7 @@ export default function App() {
         }}
         importView={(
           <Suspense fallback={<p role="status">Abrindo importação…</p>}>
-            <ImportView data={data} month={data.month} service={service} refresh={refresh} />
+            <ImportView data={data} month={data.month} loadHistoryPage={commands.history} confirmImport={commands.confirmImport} refresh={refresh} />
           </Suspense>
         )}
       />
@@ -145,6 +158,7 @@ export default function App() {
 function Status({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <main className="boot">
+      <Brand />
       {title && <h1>{title}</h1>}
       <div className="boot-message" role="status">{children}</div>
     </main>

@@ -1,11 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
+import { dateInMonth, todayInSaoPaulo } from "../date";
+import { spendingWindow, summarizeSpending } from "./spending";
 import type {
   FinanceService,
   Entry,
   Dashboard,
   Action,
   Session,
+  SavingsTarget,
+  Valuation,
 } from "../contracts";
 
 const first = (month: string) => `${month.slice(0, 7)}-01`;
@@ -208,14 +212,17 @@ export function createSupabaseService(
         case "saveAccount":
           await upsert("accounts", { ...action.account });
           break;
-        case "saveCard":
-          await upsert("cards", {
-            ...action.card,
-            due_day: action.card.dueDay,
-            closing_day: action.card.dueDay,
-            dueDay: undefined,
+        case "saveCard": {
+          const { id, name, bank, dueDay } = action.card;
+          const { error } = await db.rpc("save_card", {
+            p_id: id ?? null,
+            p_name: name,
+            p_bank: bank ?? null,
+            p_due_day: dueDay,
           });
+          fail(error);
           break;
+        }
         case "saveInvestment": {
           const x = action.investment;
           await upsert("investments", {
@@ -238,6 +245,26 @@ export function createSupabaseService(
             month: first(action.month),
             amount_cents: action.amount,
           });
+          break;
+        }
+        case "saveBudget": {
+          const u = await user();
+          await upsert("monthly_budgets", { user_id: u.id, month: first(action.month), amount_cents: action.amount });
+          break;
+        }
+        case "saveTarget": {
+          const { id, name, amount } = action.target;
+          await upsert("savings_goals", { ...(id ? { id } : {}), name, target_cents: amount });
+          break;
+        }
+        case "deleteTarget":
+          await remove("savings_goals", action.id);
+          break;
+        case "contributeTarget": {
+          const { error } = await db.from("goal_contributions").insert({
+            goal_id: action.id, amount_cents: action.amount, contributed_on: todayInSaoPaulo(),
+          });
+          fail(error);
           break;
         }
         case "addInstallments": {
@@ -289,11 +316,25 @@ export function createSupabaseService(
         }
       }
     },
-    async dashboard(month): Promise<Dashboard> {
-      const { data, error } = await db.rpc("monthly_dashboard", {
-        p_month: first(month),
-      });
+    async analysis(date, period) {
+      const window = spendingWindow(date, period);
+      const { data, error } = await db.rpc("nitido_expense_days", { p_start: window.previous, p_end: window.end });
       fail(error);
+      const rows = (data as { date: string; category: string; amount: number }[]).map(
+        (row) => ({ ...row, amount: Number(row.amount) }),
+      );
+      return summarizeSpending(rows, window, period);
+    },
+    async dashboard(month): Promise<Dashboard> {
+      const [{ data, error }, planning] = await Promise.all([
+        db.rpc("monthly_dashboard", { p_month: first(month) }),
+        db.rpc("nitido_planning", { p_month: first(month) }),
+      ]);
+      fail(error);
+      fail(planning.error);
+      const { budget, targets, valuations } = planning.data as {
+        budget: number; targets: SavingsTarget[]; valuations: Valuation[];
+      };
       const {
         profile,
         accounts,
@@ -393,12 +434,10 @@ export function createSupabaseService(
               .filter((p: any) => p.invoice_id === i.id)
               .reduce((a: number, p: any) => a + Number(p.amount_cents), 0)
           : 0;
-        const last = new Date(`${monthEnd(month)}T00:00:00Z`);
-        last.setUTCDate(0);
         return {
           cardId: c.id,
           month,
-          dueDate: `${month.slice(0, 7)}-${String(Math.min(c.due_day, last.getUTCDate())).padStart(2, "0")}`,
+          dueDate: c.due_day == null ? null : dateInMonth(month, c.due_day),
           total,
           paid,
         };
@@ -430,12 +469,15 @@ export function createSupabaseService(
         goal: Number(
           goals.find((g) => g.month === first(month))?.amount_cents ?? 0,
         ),
+        budget: Number(budget),
+        targets: targets.map(({ amount, saved, ...target }) => ({ ...target, amount: Number(amount), saved: Number(saved) })),
+        valuations: valuations.map(({ date, value }) => ({ date, value: Number(value) })),
         saved: -sum(confirmed.filter((e) => e.kind === "saving")),
         cashIn: sum(confirmed.filter((e) => !!e.accountId && e.amount > 0)),
         cashOut: -sum(confirmed.filter((e) => !!e.accountId && e.amount < 0)),
         invested: investments.reduce((a, x) => a + Number(x.value_cents), 0),
         recent: confirmed.slice(0, 8),
-        upcoming: entries.filter((e) => e.status === "planned").slice(0, 8),
+        upcoming: entries.filter((e) => e.status === "planned"),
         trend: trend.map((x) => ({
           month: x.month,
           income: Number(x.income),
@@ -450,6 +492,7 @@ export function createSupabaseService(
           id: x.id,
           name: x.name,
           dueDay: x.due_day,
+          accountId: x.account_id ?? undefined,
         })),
         investments: investments.map((x) => ({
           id: x.id,

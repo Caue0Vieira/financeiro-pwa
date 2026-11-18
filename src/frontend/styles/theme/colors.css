@@ -1,0 +1,18 @@
+:root {
+  --on-primary: #fff;
+  --selection-bg: #a5edd4;
+  --selection-text: #102b23;
+  --feature-start: #06483b;
+  --feature-end: #087258;
+  --overlay-backdrop: #102c2376;
+  --overlay-shadow: 0 20px 72px #061d1666;
+  --picker-shadow: 0 8px 24px #061d1633;
+  --picker-option-hover: color-mix(in srgb, var(--accent) 12%, transparent);
+
+  --chart-category-1: #02724c;
+  --chart-category-2: #08a2d8;
+  --chart-category-3: #ffba2e;
+  --chart-category-4: #f8336d;
+  --chart-category-5: #6555fc;
+  --chart-category-6: #cbd4d9;
+}

@@ -1,0 +1,11 @@
+*, *::before, *::after { box-sizing: border-box; }
+:root { color: var(--text); background: var(--bg); --round: 20px; --ease-out: cubic-bezier(.23, 1, .32, 1); }
+body { margin: 0; }
+h1, h2, h3, p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; }
+:disabled { cursor: not-allowed; opacity: .55; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+::selection { background: var(--selection-bg); color: var(--selection-text); }
+svg { display: block; flex: none; }
+img { display: block; max-width: 100%; }

@@ -1,0 +1,71 @@
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10211d;
+  --glow: #1a3d36;
+  --cool-glow: #172f38;
+  --surface: #1b2e29;
+  --glass: #192e28ed;
+  --glass-edge: #334b43;
+  --text: #edf8f0;
+  --muted: #b3c9be;
+  --line: #334a40;
+  --primary: #13785f;
+  --primary-hover: #0e654f;
+  --accent: #8ce9cd;
+  --accent-soft: #233e35;
+  --focus: var(--accent);
+  --danger: #ffb1bb;
+  --danger-soft: #462831;
+  --warning: #ffdcb1;
+  --warning-soft: #3f2e20;
+  --chart-income: #39b893;
+  --chart-income-active: #89e8c8;
+  --chart-expenses: #668b7e;
+  --chart-expenses-active: #90ada1;
+  --shadow: 0 6px 22px #05100b27;
+  --overlay-backdrop: #0718138c;
+  --picker-shadow: 0 8px 24px #0007;
+  --mobile-surface: #132520;
+  --mobile-top: #1a322b;
+
+  --page-paper: var(--bg);
+  --page-paper-end: var(--bg);
+  --page-ink: var(--text);
+  --page-muted: var(--muted);
+  --home-accent: var(--accent);
+  --home-greeting: var(--accent);
+  --home-line: var(--line);
+  --home-action: var(--accent-soft);
+  --home-action-aqua: var(--accent-soft);
+  --home-action-leaf: var(--accent-soft);
+  --home-action-mint: var(--accent-soft);
+  --ref-green: var(--accent);
+  --ref-positive: var(--accent);
+  --ref-line: var(--line);
+  --ref-track: var(--surface);
+  --ref-action-soft: var(--accent-soft);
+  --ref-menu: var(--surface);
+  --ref-portfolio: var(--accent-soft);
+  --portfolio-line: var(--accent);
+
+  --login-haze: #0b2823e8;
+  --login-text: #f0fff7;
+  --login-muted: #c2e0d5;
+  --login-glass: linear-gradient(142deg, #2c5047dc, #163630d9);
+  --login-edge: #9bcabd76;
+  --login-depth: #021e18a6;
+  --login-refract: #d9fff145;
+  --login-focus: #adf7dd;
+  --login-error-bg: #4e2634;
+  --login-error-text: #ffdbe2;
+  --login-toggle: #21473de8;
+
+  --welcome-text: var(--text);
+  --welcome-muted: var(--muted);
+  --welcome-bg: var(--bg);
+  --welcome-glow: var(--glow);
+  --welcome-surface: var(--surface);
+  --welcome-scrim: linear-gradient(
+    180deg, #10211dfc 0%, #10211df2 23%, #10211d32 60%, #10211d6c 78%, #10211df0 100%
+  );
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financeiro-static-v2';
+const CACHE_NAME = 'financeiro-static-v4';
 const OFFLINE_PATH = '/offline.html';
 const STATIC_PATHS = new Set([
   OFFLINE_PATH,

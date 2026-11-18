@@ -1,4 +1,4 @@
-# Financeiro PWA
+# Nítido · Finanças pessoais
 
 Controle pessoal de receitas, despesas, faturas, investimentos e metas, em português e reais.
 
@@ -12,7 +12,13 @@ npm test
 npm run dev
 ```
 
-Sem credenciais do Supabase, o servidor de desenvolvimento abre uma demonstração com dados fictícios. A demonstração guarda alterações apenas enquanto a página está aberta. Use **Importar arquivo** para testar extratos localmente e **Perfil** para alternar os temas.
+Sem credenciais do Supabase, o servidor de desenvolvimento abre uma demonstração com dados fictícios. A demonstração guarda alterações apenas enquanto a página está aberta. Use **Importar arquivos** para testar extratos localmente e **Perfil** para alternar os temas.
+
+## Estrutura
+
+- [src/frontend](src/frontend) reúne as telas, os componentes, os gráficos e os estilos da interface.
+- [src/backend](src/backend) reúne o adaptador do Supabase e a demonstração em memória. O esquema, as regras de acesso e as funções do banco ficam em [supabase/migrations](supabase/migrations).
+- [src/App.tsx](src/App.tsx) carrega a sessão e conecta os adaptadores à interface pelos tipos definidos em [src/contracts.ts](src/contracts.ts). A leitura de CSV e OFX fica em [src/imports](src/imports) e roda no navegador.
 
 ## Configurar e publicar
 
@@ -34,7 +40,7 @@ No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adi
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.
 - Para a fatura CSV, selecione o apelido do cartão, o mês com vencimento e o mapeamento das colunas. Revise os vínculos sugeridos com parcelas existentes.
-- Depois de registrar as compras, use **Contas → Faturas → Conciliar** para associar os pagamentos do extrato. A coluna **A pagar** acompanha o saldo restante.
+- Cadastre cartões em **Cartões**, com um banco ou como avulsos. Em **Compromissos → Faturas do mês → Vincular pagamento**, associe os pagamentos do extrato. O indicador **A pagar** acompanha o saldo restante.
 
 O arquivo original é lido no navegador. Após você confirmar, só os lançamentos revisados e os metadados necessários à deduplicação e cobertura são enviados ao Supabase.
 

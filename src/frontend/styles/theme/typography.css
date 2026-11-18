@@ -1,0 +1,14 @@
+@import "@fontsource-variable/dm-sans/wght.css";
+@import "@fontsource-variable/bricolage-grotesque/wght.css";
+
+:root {
+  --font-body: "DM Sans Variable", sans-serif;
+  --display: "Bricolage Grotesque Variable", var(--font-body);
+  font-family: var(--font-body);
+  font-synthesis: none;
+}
+
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.027em; }
+h1 { font-size: 2.55rem; font-weight: 720; line-height: 1.08; }
+h2 { font-size: 1.24rem; font-weight: 690; line-height: 1.2; }
+small { font-size: .8rem; }

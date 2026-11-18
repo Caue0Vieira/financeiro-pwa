@@ -1,0 +1,25 @@
+.modal {
+  width: min(560px, calc(100% - 26px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--glass-edge);
+  border-radius: 21px;
+  padding: 19px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--overlay-shadow);
+}
+.modal[open] { animation: dialog-in 160ms var(--ease-out); }
+.modal::backdrop { background: var(--overlay-backdrop); backdrop-filter: blur(5px); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -5px -5px 13px 0; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.inline-error, .confirm-delete {
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: .86rem;
+  margin-top: 10px;
+}
+.confirm-delete .button { margin-top: 8px; border: 1px solid currentColor; }

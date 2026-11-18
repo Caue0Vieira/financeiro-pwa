@@ -1,10 +1,21 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './frontend/styles/theme/typography.css';
+import './frontend/styles/theme/colors.css';
+import './frontend/styles/theme/light.css';
+import './frontend/styles/theme/dark.css';
+import './frontend/styles/base.css';
+import './frontend/styles/components/fields.css';
+import './frontend/styles/components/dialog.css';
+import './frontend/styles/components/notifications.css';
+import { ThemeProvider } from './frontend/theme/ThemeProvider';
 import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 );
 

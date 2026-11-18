@@ -1,20 +1,44 @@
-import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence } from '../contracts';
-import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date';
+import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from '../date.ts';
+import { addDays, spendingWindow, summarizeSpending } from './spending.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();
-  const accounts: Account[] = [{ id: 'conta', name: 'Conta principal' }];
-  const cards: Card[] = [{ id: 'cartao', name: 'Meu cartão', dueDay: 24 }];
+  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }];
+  const cards: Card[] = [{ id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24 }];
   const investments: Investment[] = [
-    { id: 'reserva', institution: 'Banco Horizonte', name: 'Reserva de emergência', contributed: 650000, value: 689740, updatedOn: todayInSaoPaulo() },
-    { id: 'tesouro', institution: 'Corretora Pontal', name: 'Tesouro Selic', contributed: 520000, value: 554820, updatedOn: todayInSaoPaulo() },
+    { id: 'acoes', institution: 'Corretora Pontal', name: 'Ações', contributed: 218025, value: 245060, updatedOn: todayInSaoPaulo() },
+    { id: 'fundo', institution: 'Corretora Pontal', name: 'Fundos de investimento', contributed: 113197, value: 123045, updatedOn: todayInSaoPaulo() },
+    { id: 'cripto', institution: 'Corretora Pontal', name: 'Criptomoedas', contributed: 55481, value: 63970, updatedOn: todayInSaoPaulo() },
   ];
   const recurrences: Recurrence[] = [
     { id: 'internet', description: 'Internet residencial', amount: -11990, kind: 'expense', category: 'Moradia', startMonth: month, day: 26 },
     { id: 'streaming', description: 'Streaming', amount: -4490, kind: 'expense', category: 'Assinaturas', startMonth: month, day: 28 },
   ];
-  const profile: Profile = { name: 'Minha conta' };
+  const profile: Profile = { name: 'Ayesha Khan' };
   const goals = new Map<string, number>([[month, 90000]]);
+  const budgets = new Map<string, number>([[month, 200000]]);
+  const targets: SavingsTarget[] = [
+    { id: 'emergencia', name: 'Reserva de emergência', amount: 300000, saved: 120000 },
+    { id: 'ferias', name: 'Viagem de férias', amount: 250000, saved: 85000 },
+    { id: 'notebook', name: 'Notebook novo', amount: 150000, saved: 60000 },
+    { id: 'casa', name: 'Entrada da casa', amount: 2000000, saved: 500000 },
+  ];
+  const values = new Map<string, Valuation[]>(investments.map((item) => [item.id,
+    Array.from({ length: 73 }, (_, index) => ({
+      date: addDays(todayInSaoPaulo(), (index - 72) * 3),
+      value: Math.round(item.value * (0.78 + index * 0.22 / 72 + Math.sin(index * Math.PI / 4) * 0.017)),
+    })),
+  ]));
+
+  function portfolioHistory() {
+    const series = [...values.values()].map((points) => [...points].sort((a, b) => a.date.localeCompare(b.date)));
+    const days = [...new Set(series.flatMap((points) => points.map(({ date }) => date)))].sort();
+    return days.map((date) => ({
+      date,
+      value: series.reduce((sum, points) => sum + (points.findLast((point) => point.date <= date)?.value ?? 0), 0),
+    }));
+  }
   const imported = new Set<string>();
   const externalIds = new Set<string>();
   const coverage: Coverage[] = [];
@@ -25,16 +49,30 @@ export function createDemoService(): FinanceService {
     entries.push({ id: crypto.randomUUID(), date, description, amount, kind, category, source: 'manual', status: 'confirmed', accountId: 'conta', ...rest });
   };
 
-  for (let index = -5; index <= 0; index++) {
+  for (let index = -5; index < 0; index++) {
     const period = shiftMonth(month, index);
     seed(dateInMonth(period, 5), 'Salário', 625000 + index * 7000, 'income', 'Salário');
     seed(dateInMonth(period, 7), 'Aluguel', -188000, 'expense', 'Moradia');
     seed(dateInMonth(period, 14), 'Mercado', -42180 - Math.abs(index * 3600), 'expense', 'Alimentação');
     seed(dateInMonth(period, 9), 'Transporte', -17850 + index * 2500, 'expense', 'Transporte');
-    if (index < 0) seed(dateInMonth(period, 18), 'Outras despesas', -71000 + index * 5300, 'expense', 'Outros');
+    seed(dateInMonth(period, 18), 'Outras despesas', -71000 + index * 5300, 'expense', 'Outros');
   }
-  seed(dateInMonth(month, 13), 'Farmácia', -8750, 'expense', 'Saúde');
-  seed(dateInMonth(month, 12), 'Reserva do mês', -65000, 'saving', 'Economia');
+  const today = todayInSaoPaulo();
+  const recentDate = (days: number) => {
+    const date = addDays(today, -days);
+    return date.startsWith(month) ? date : dateInMonth(month, 1);
+  };
+  seed(today, 'Mercado', -4520, 'expense', 'Alimentação');
+  seed(today, 'Salário', 120000, 'income', 'Salário');
+  seed(recentDate(1), 'Netflix', -1599, 'expense', 'Assinaturas');
+  seed(recentDate(1), 'Cafeteria', -450, 'expense', 'Alimentação');
+  seed(recentDate(2), 'Starbucks', -575, 'expense', 'Alimentação');
+  seed(recentDate(2), 'Uber', -1240, 'expense', 'Transporte');
+  seed(recentDate(3), 'Walmart', -6832, 'expense', 'Compras');
+  seed(recentDate(4), 'Farmácia', -2450, 'expense', 'Saúde');
+  seed(recentDate(5), 'Claude', -9900, 'expense', 'Assinaturas');
+  seed(recentDate(6), 'Gemini', -9699, 'expense', 'Assinaturas');
+  seed(recentDate(7), 'Prime Video', -1990, 'expense', 'Assinaturas');
   seed(dateInMonth(month, 22), 'Energia elétrica', -16340, 'expense', 'Moradia', { status: 'planned' });
   seed(dateInMonth(month, 24), 'Fone de ouvido', -9990, 'expense', 'Compras', {
     source: 'installment', accountId: undefined, cardId: 'cartao', invoiceMonth: month,
@@ -58,7 +96,7 @@ export function createDemoService(): FinanceService {
     return cards.map((card) => ({
       cardId: card.id,
       month: period,
-      dueDate: dateInMonth(period, card.dueDay),
+      dueDate: card.dueDay === null ? null : dateInMonth(period, card.dueDay),
       total: items(period).filter((entry) => entry.cardId === card.id).reduce((sum, entry) => sum - entry.amount, 0),
       paid: allocations.filter((item) => item.cardId === card.id && item.month === period).reduce((sum, item) => sum + item.amount, 0),
     })).filter((invoice) => invoice.total !== 0 || invoice.paid !== 0);
@@ -98,12 +136,15 @@ export function createDemoService(): FinanceService {
           + monthInvoices.reduce((sum, invoice) => sum + Math.max(0, invoice.total - invoice.paid), 0),
         projectedSurplus: income + all.filter(isExpense).reduce((sum, entry) => sum + entry.amount, 0),
         goal: goals.get(period) ?? 0,
+        budget: budgets.get(period) ?? 0,
+        targets: targets.map((target) => ({ ...target })),
+        valuations: portfolioHistory(),
         saved: confirmed.filter((entry) => entry.kind === 'saving').reduce((sum, entry) => sum - entry.amount, 0),
         cashIn: cash.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0),
         cashOut: cash.reduce((sum, entry) => sum + Math.max(0, -entry.amount), 0),
         invested: investments.reduce((total, investment) => total + investment.value, 0),
         recent: confirmed.slice(0, 6),
-        upcoming: upcoming.slice(0, 12),
+        upcoming,
         trend: Array.from({ length: 6 }, (_, i) => {
           const previous = shiftMonth(period, i - 5);
           const summary = monthly(previous);
@@ -114,6 +155,12 @@ export function createDemoService(): FinanceService {
         accounts: [...accounts], cards: [...cards], investments: [...investments], recurrences: [...recurrences],
         invoices: monthInvoices, coverage: coverage.filter((item) => item.month === period),
       };
+    },
+    async analysis(date, period) {
+      const window = spendingWindow(date, period);
+      return summarizeSpending(entries.filter((entry) =>
+        entry.status === 'confirmed' && isExpense(entry) && entry.date >= window.previous && entry.date < window.end
+      ).map(({ date, category, amount }) => ({ date, category, amount: -amount })), window, period);
     },
     async history(period, offset, limit) {
       return items(period).slice(offset, offset + limit).map((entry) => ({
@@ -140,14 +187,30 @@ export function createDemoService(): FinanceService {
         case 'saveAccount':
           put(accounts, { ...action.account, id: action.account.id ?? crypto.randomUUID() });
           return;
-        case 'saveCard':
-          put(cards, { ...action.card, id: action.card.id ?? crypto.randomUUID() });
+        case 'saveCard': {
+          const { id, name, dueDay } = action.card;
+          const bank = action.card.bank?.trim();
+          const previous = cards.find((card) => card.id === id);
+          let account = bank ? accounts.find((item) =>
+            item.id === previous?.accountId && item.name.trim().toLowerCase() === bank.toLowerCase()
+          ) ?? accounts.find((item) => item.name.trim().toLowerCase() === bank.toLowerCase()) : undefined;
+          if (bank && !account) {
+            account = { id: crypto.randomUUID(), name: bank };
+            accounts.push(account);
+          }
+          put(cards, { id: id ?? crypto.randomUUID(), name, dueDay, accountId: account?.id });
           return;
-        case 'saveInvestment':
-          put(investments, { ...action.investment, id: action.investment.id ?? crypto.randomUUID() });
+        }
+        case 'saveInvestment': {
+          const investment = { ...action.investment, id: action.investment.id ?? crypto.randomUUID() };
+          put(investments, investment);
+          const points = (values.get(investment.id) ?? []).filter(({ date }) => date !== investment.updatedOn);
+          values.set(investment.id, [...points, { date: investment.updatedOn, value: investment.value }]);
           return;
+        }
         case 'deleteInvestment':
           remove(investments, action.id);
+          values.delete(action.id);
           return;
         case 'saveRecurrence': {
           const previous = recurrences.find((item) => item.id === action.recurrence.id);
@@ -167,6 +230,24 @@ export function createDemoService(): FinanceService {
         case 'saveGoal':
           goals.set(action.month, action.amount);
           return;
+        case 'saveBudget':
+          budgets.set(action.month, action.amount);
+          return;
+        case 'saveTarget': {
+          const id = action.target.id ?? crypto.randomUUID();
+          const previous = targets.find((target) => target.id === id);
+          put(targets, { ...action.target, id, saved: previous?.saved ?? 0 });
+          return;
+        }
+        case 'deleteTarget':
+          remove(targets, action.id);
+          return;
+        case 'contributeTarget': {
+          const target = targets.find((item) => item.id === action.id);
+          if (!target || action.amount <= 0) throw new Error('Informe um valor positivo para o aporte.');
+          target.saved += action.amount;
+          return;
+        }
         case 'addInstallments': {
           const card = cards.find((item) => item.id === action.cardId);
           if (!card) throw new Error('Escolha um cartão.');
@@ -174,7 +255,7 @@ export function createDemoService(): FinanceService {
           const remainder = action.total % action.count;
           for (let index = 0; index < action.count; index++) {
             const period = shiftMonth(action.firstMonth, index);
-            seed(dateInMonth(period, card.dueDay), action.description, -(base + Number(index < remainder)), 'expense', action.category, {
+            seed(dateInMonth(period, card.dueDay ?? 31), action.description, -(base + Number(index < remainder)), 'expense', action.category, {
               source: 'installment', invoiceMonth: period, accountId: undefined, cardId: card.id,
               installmentNumber: index + 1, installmentCount: action.count, status: 'planned',
             });
@@ -213,7 +294,7 @@ export function createDemoService(): FinanceService {
           match.source = 'invoice';
           linked++;
         } else {
-          const date = card && payload.month ? dateInMonth(payload.month, card.dueDay) : row.date;
+          const date = card?.dueDay && payload.month ? dateInMonth(payload.month, card.dueDay) : row.date;
           seed(date, row.description, row.amount, row.kind, row.category, {
             source: payload.type, accountId: payload.accountId, cardId: payload.cardId,
             invoiceMonth: payload.month, installmentNumber: row.installmentNumber, installmentCount: row.installmentCount,

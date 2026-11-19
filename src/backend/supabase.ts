@@ -545,6 +545,10 @@ export function createSupabaseService(
         invested: investments.reduce((a, x) => a + Number(x.value_cents), 0),
         recent: confirmed.slice(0, 8),
         upcoming: entries.filter((e) => e.status === "planned"),
+        // Card installments belong to the month of their invoice, not of the purchase date.
+        installments: [...entries.filter((e) => !e.cardId), ...invoiceEntries].filter(
+          (e) => (e.installmentCount ?? 0) > 1 && ["expense", "refund"].includes(e.kind),
+        ),
         trend: trend.map((x) => ({
           month: x.month,
           income: Number(x.income),

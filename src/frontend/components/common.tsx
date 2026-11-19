@@ -287,6 +287,46 @@ export function categoryAppearance(name: string): { icon: IconName; tone: string
   return categoryIcons[name.toLocaleLowerCase("pt-BR")] ?? { icon: "receipt", tone: "mint" };
 }
 
+/** Icon for an entry: the merchant's logo when known, otherwise its category. */
+export function EntryBadge({
+  entry,
+  compact,
+}: {
+  entry: Pick<Entry, "description" | "category" | "kind" | "amount">;
+  compact?: boolean;
+}) {
+  const isPix = /\bpix\b/i.test(entry.description) || /^pix$/i.test(entry.category.trim());
+  const category = categoryAppearance(entry.category);
+  const appearance =
+    entry.kind === "saving"
+      ? ({ icon: "piggy", tone: "teal" } as const)
+      : entry.kind === "card_payment"
+        ? ({ icon: "card", tone: "violet" } as const)
+        : entry.amount > 0
+          ? ({ icon: "arrowDown", tone: "mint" } as const)
+          : category;
+  const merchant = isPix || entry.kind === "card_payment" ? undefined : findMerchant(entry.description);
+  const icon =
+    isPix
+      ? "pix"
+      : appearance.icon === "food" && /caf[eé]/i.test(entry.description)
+        ? "coffee"
+        : (entry.kind === "expense" || entry.kind === "refund") && isShopping(entry.description)
+          ? "cart"
+          : compact && appearance.icon === "arrowDown"
+            ? "receipt"
+            : appearance.icon;
+  return (
+    <span
+      className={`transaction-icon tone-${appearance.tone}${merchant ? " merchant-icon" : ""}`}
+      data-tone={icon === "coffee" ? "coffee" : appearance.tone}
+      style={merchant ? { backgroundColor: merchant.background } : undefined}
+    >
+      {merchant ? <img src={merchant.icon} alt="" /> : <Icon name={icon} size={18} />}
+    </span>
+  );
+}
+
 export function EntryRow({
   entry,
   onEdit,
@@ -300,37 +340,8 @@ export function EntryRow({
   compact?: boolean;
   dateText?: string;
 }) {
-  const isPix = /\bpix\b/i.test(entry.description) || /^pix$/i.test(entry.category.trim());
-  const category = categoryAppearance(entry.category);
-  const appearance =
-    entry.kind === "saving"
-      ? ({ icon: "piggy", tone: "teal" } as const)
-      : entry.kind === "card_payment"
-        ? ({ icon: "card", tone: "violet" } as const)
-        : entry.amount > 0
-          ? ({ icon: "arrowDown", tone: "mint" } as const)
-          : category;
   const amountText = (entry.amount > 0 ? "+ " : entry.amount < 0 ? "− " : "") + money(Math.abs(entry.amount));
-  const merchant = isPix || entry.kind === "card_payment" ? undefined : findMerchant(entry.description);
-  const icon =
-    isPix
-      ? "pix"
-      : appearance.icon === "food" && /caf[eé]/i.test(entry.description)
-        ? "coffee"
-        : (entry.kind === "expense" || entry.kind === "refund") && isShopping(entry.description)
-          ? "cart"
-          : compact && appearance.icon === "arrowDown"
-            ? "receipt"
-            : appearance.icon;
-  const badge = (
-    <span
-      className={`transaction-icon tone-${appearance.tone}${merchant ? " merchant-icon" : ""}`}
-      data-tone={icon === "coffee" ? "coffee" : appearance.tone}
-      style={merchant ? { backgroundColor: merchant.background } : undefined}
-    >
-      {merchant ? <img src={merchant.icon} alt="" /> : <Icon name={icon} size={18} />}
-    </span>
-  );
+  const badge = <EntryBadge entry={entry} compact={compact} />;
   if (compact) {
     const recentDate = grouped
       ? `${entry.category || kindLabel[entry.kind]}${entry.status === "planned" ? " · Previsto" : ""}`

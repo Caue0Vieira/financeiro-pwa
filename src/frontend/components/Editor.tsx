@@ -552,7 +552,7 @@ export default function Editor({
                     placeholder="Ex.: 10"
                   />
                   <p className="form-hint full">
-                    Esses dias se repetem todo mês. Para mudar só um mês, use Compromissos → Faturas do mês.
+                    Esses dias se repetem todo mês. Para mudar só um mês, use Compromissos → Faturas do cartão.
                   </p>
                   {linkedCard && (
                     <details className="form-details full">

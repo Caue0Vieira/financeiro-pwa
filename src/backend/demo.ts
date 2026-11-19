@@ -82,6 +82,10 @@ export function createDemoService(): FinanceService {
     source: 'installment', accountId: undefined, cardId: 'cartao', invoiceMonth: month,
     installmentNumber: 2, installmentCount: 4, status: 'planned',
   });
+  seed(dateInMonth(month, 24), 'Geladeira', -38990, 'expense', 'Casa', {
+    source: 'installment', accountId: undefined, cardId: 'cartao', invoiceMonth: month,
+    installmentNumber: 7, installmentCount: 10, status: 'planned',
+  });
 
   function items(period: string) {
     const result = entries.filter((entry) => (entry.invoiceMonth ?? entry.date.slice(0, 7)) === period);
@@ -149,6 +153,7 @@ export function createDemoService(): FinanceService {
         invested: investments.reduce((total, investment) => total + investment.value, 0),
         recent: confirmed.slice(0, 6),
         upcoming,
+        installments: all.filter((entry) => (entry.installmentCount ?? 0) > 1 && isExpense(entry)),
         trend: Array.from({ length: 6 }, (_, i) => {
           const previous = shiftMonth(period, i - 5);
           const summary = monthly(previous);

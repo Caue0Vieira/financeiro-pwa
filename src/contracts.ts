@@ -92,6 +92,8 @@ export interface Dashboard {
   invested: number;
   recent: Entry[];
   upcoming: Entry[];
+  /** This month's installments of purchases split in parts (card invoice or account), planned or confirmed. */
+  installments: Entry[];
   trend: { month: string; income: number; expenses: number }[];
   categories: { name: string; amount: number }[];
   accounts: Account[];

@@ -22,8 +22,10 @@ export type EditModal =
   | { type: "contribution"; item: SavingsTarget }
   | { type: "card"; item?: Card; standalone?: boolean }
   | { type: "card-picker" }
-  | { type: "commitment" }
+  | { type: "commitment"; mode?: CommitmentMode }
   | { type: "budget"; item?: never };
+
+export type CommitmentMode = "monthly" | "subscription" | "installments" | "once";
 
 export type OpenEditor = (modal: EditModal) => void;
 

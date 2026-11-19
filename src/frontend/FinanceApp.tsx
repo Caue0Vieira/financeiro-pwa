@@ -303,6 +303,7 @@ export default function FinanceApp({
           <CommitmentEditor
             cards={activeCards}
             month={month}
+            initialMode={modal.mode}
             busy={busy}
             error={editorError}
             close={() => { if (!busy) setModal(undefined); }}

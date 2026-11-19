@@ -7,6 +7,8 @@ export const monthName = (s: string) =>
     month: "long",
     year: "numeric",
   });
+/** "Cartão Nubank", without repeating the word when the name already has it. */
+export const cardLabel = (name: string) => (/^cart[aã]o(\s|$)/i.test(name.trim()) ? name : `Cartão ${name}`);
 export const dateLabel = (s: string) =>
   s
     ? new Date(s + "T12:00:00")

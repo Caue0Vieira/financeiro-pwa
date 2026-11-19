@@ -49,6 +49,8 @@ export interface Recurrence {
   startMonth: string;
   day: number;
   endMonth?: string;
+  /** Card the charge goes on; each month's charge then joins that card's invoice. Expenses only. */
+  cardId?: string;
 }
 export interface Invoice {
   cardId: string;

@@ -14,6 +14,7 @@ import { BankIcon, bankSuggestions, findBank } from "./BankIcon";
 import { CardModelPicker } from "./HomeCardArt";
 import { Field } from "./Field";
 import { Overlay } from "./Overlay";
+import { PayWithField } from "./PayWithField";
 import { Select } from "./Select";
 import MoneyField from "./MoneyField";
 import { parseBrazilianAmount } from "../../imports/parsers";
@@ -57,6 +58,9 @@ export default function Editor({
   const [kind, setKind] = useState<EntryKind>(
     type === "entry" ? (modal.item?.kind ?? modal.kind ?? "expense") : "expense",
   );
+  // Cards a recurring bill can be charged on; keeps the current one even if it was deleted.
+  const recurrenceCards =
+    type === "recurrence" ? data.cards.filter(({ id, archived }) => !archived || id === item?.cardId) : [];
   const currentBank = type === "card" ? data.accounts.find(({ id }) => id === item?.accountId)?.name : undefined;
   const [linkedCard, setLinkedCard] = useState(
     type === "card" && (item ? Boolean(currentBank) : !modal.standalone),
@@ -213,6 +217,7 @@ export default function Editor({
           startMonth: read(f, "startMonth") || item?.startMonth || month,
           day: Number(read(f, "day")),
           endMonth: read(f, "endMonth") || undefined,
+          cardId: (k === "expense" && read(f, "payWith")) || undefined,
         },
         effectiveMonth: read(f, "effectiveMonth") || undefined,
       });
@@ -603,6 +608,7 @@ export default function Editor({
                 required
                 full
               />
+              {recurrenceCards.length > 0 && <PayWithField cards={recurrenceCards} defaultValue={item?.cardId} />}
               <details className="form-details full">
                 <summary>Categoria e período</summary>
                 <div className="form-grid">

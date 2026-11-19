@@ -96,6 +96,15 @@ await db.query("insert into public.transactions(account_id,occurred_on,descripti
 await db.query("select public.save_recurrence($1::jsonb,'2026-02-01')",[JSON.stringify({...recurrence,id:rule,amount:550000})]);
 assert.equal(Number((await db.query("select amount_cents from public.transactions where recurring_rule_id=$1",[rule])).rows[0].amount_cents),500000);
 assert.equal((await db.query('select count(*)::int as n from public.recurring_rules')).rows[0].n,2);
+const subscription={description:'Streaming',amount:-4490,kind:'expense',category:'Assinaturas',startMonth:'2026-01-01',day:28,cardId:card};
+const subscriptionRule=(await db.query('select public.save_recurrence($1::jsonb,null) as id',[JSON.stringify(subscription)])).rows[0].id;
+assert.equal((await db.query('select card_id from public.recurring_rules where id=$1',[subscriptionRule])).rows[0].card_id,card);
+await db.query("select public.save_recurrence($1::jsonb,'2026-03-01')",[JSON.stringify({...subscription,id:subscriptionRule,amount:-5490})]);
+assert.deepEqual((await db.query("select card_id,amount_cents from public.recurring_rules where description='Streaming' order by starts_on")).rows.map(r=>[r.card_id,Number(r.amount_cents)]),[[card,-4490],[card,-5490]]);
+const laterRule=(await db.query("select id from public.recurring_rules where description='Streaming' and starts_on='2026-03-01'")).rows[0].id;
+await db.query("select public.save_recurrence($1::jsonb,'2026-03-01')",[JSON.stringify({...subscription,id:laterRule,startMonth:'2026-03-01',cardId:null})]);
+assert.equal((await db.query('select card_id from public.recurring_rules where id=$1',[laterRule])).rows[0].card_id,null);
+await assert.rejects(db.query('select public.save_recurrence($1::jsonb,null)',[JSON.stringify({...recurrence,cardId:card})]),/Income cannot be charged on a card/);
 const sameId={...payload,fileHash:'b'.repeat(64)};
 const duplicate=(await db.query('select public.import_transactions($1::jsonb) as result',[JSON.stringify(sameId)])).rows[0].result;
 assert.equal(duplicate.skipped,1);

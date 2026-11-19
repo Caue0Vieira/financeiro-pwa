@@ -9,6 +9,7 @@ import { Icon, type IconName } from "./common";
 import { Field } from "./Field";
 import MoneyField from "./MoneyField";
 import { Overlay } from "./Overlay";
+import { PayWithField } from "./PayWithField";
 import { Select } from "./Select";
 
 const modes: { id: CommitmentMode; label: string; hint: string; example: string; icon: IconName; save: string }[] = [
@@ -73,6 +74,7 @@ export default function CommitmentEditor({
         return;
       }
       const kind = mode === "monthly" && read("kind") === "income" ? "income" : "expense";
+      const cardId = (kind === "expense" && read("payWith")) || undefined;
       void save({
         type: "saveRecurrence",
         recurrence: {
@@ -86,6 +88,7 @@ export default function CommitmentEditor({
           day: Number(read("day")),
           startMonth,
           endMonth,
+          cardId,
         },
       }, startMonth);
     } else {
@@ -163,6 +166,7 @@ export default function CommitmentEditor({
                     placeholder="Ex.: 10"
                     required
                   />
+                  {cards.length > 0 && <PayWithField cards={cards} />}
                   <details className="form-details full">
                     <summary>Começa em {monthName(startMonth || month)}</summary>
                     <div className="form-grid">
@@ -236,3 +240,4 @@ export default function CommitmentEditor({
     </Overlay>
   );
 }
+

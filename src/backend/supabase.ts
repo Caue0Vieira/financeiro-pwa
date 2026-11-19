@@ -447,6 +447,8 @@ export function createSupabaseService(
           status: "planned",
           source: "recurrence",
           recurrenceId: r.id,
+          // A rule charged on a card joins this month's invoice of that card.
+          ...(r.card_id ? { cardId: r.card_id, invoiceMonth: month.slice(0, 7) } : {}),
         });
       }
       const sum = (items: Entry[]) => items.reduce((a, e) => a + e.amount, 0);
@@ -484,7 +486,11 @@ export function createSupabaseService(
           e.category,
           (categoryMap.get(e.category) ?? 0) - e.amount,
         );
-      const invoiceEntries: Entry[] = invoice_rows.map(entry);
+      // Card charges of recurring rules not yet recorded this month still count in the invoice.
+      const invoiceEntries: Entry[] = [
+        ...invoice_rows.map(entry),
+        ...entries.filter((e) => e.cardId && e.id.startsWith("recurrence:")),
+      ];
       const invoiceList = cards.map((c: any) => {
         const i = invoices.find((x: any) => x.card_id === c.id);
         const total = -sum(
@@ -585,6 +591,7 @@ export function createSupabaseService(
           startMonth: r.starts_on.slice(0, 7),
           day: r.day_of_month,
           endMonth: r.ends_on?.slice(0, 7),
+          cardId: r.card_id ?? undefined,
         })),
         invoices: invoiceList,
         coverage: batches

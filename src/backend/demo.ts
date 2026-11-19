@@ -18,6 +18,7 @@ export function createDemoService(): FinanceService {
   const recurrences: Recurrence[] = [
     { id: 'internet', description: 'Internet residencial', amount: -11990, kind: 'expense', category: 'Moradia', startMonth: month, day: 26 },
     { id: 'streaming', description: 'Streaming', amount: -4490, kind: 'expense', category: 'Assinaturas', startMonth: month, day: 28 },
+    { id: 'musica', description: 'Spotify', amount: -2190, kind: 'expense', category: 'Assinaturas', startMonth: month, day: 12, cardId: 'cartao' },
   ];
   const profile: Profile = { name: 'Ayesha Khan' };
   const goals = new Map<string, number>([[month, 90000]]);
@@ -95,6 +96,7 @@ export function createDemoService(): FinanceService {
       result.push({
         id: `previsto:${rule.id}:${period}`, date: dateInMonth(period, rule.day), description: rule.description,
         recurrenceId: rule.id, category: rule.category, amount: rule.amount, kind: rule.kind, status: 'planned', source: 'recurrence',
+        ...(rule.cardId ? { cardId: rule.cardId, invoiceMonth: period } : {}),
       });
     }
     return result.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));

@@ -12,7 +12,7 @@ import {
   type MonthBreakdown,
   type RecurringItem,
 } from "../commitments";
-import { dateLabel, money, monthName } from "../format";
+import { cardLabel, dateLabel, money, monthName } from "../format";
 import type { CommitmentMode, OpenEditor } from "../types";
 
 const parts: { id: keyof MonthBreakdown; label: string }[] = [
@@ -41,7 +41,10 @@ export default function Commitments({
   const plans = installmentPlans(data.installments);
   const breakdown = monthBreakdown(data);
   const oneOff = oneOffEntries(data.upcoming);
-  const otherCardEntries = data.upcoming.filter((entry) => entry.cardId && !entry.installmentCount);
+  // Installments and recurring card charges already have their own sections.
+  const otherCardEntries = data.upcoming.filter(
+    (entry) => entry.cardId && !entry.installmentCount && !entry.recurrenceId,
+  );
   const breakdownTotal = parts.reduce((sum, { id }) => sum + breakdown[id], 0);
   const create = (mode: CommitmentMode) => () => setModal({ type: "commitment", mode });
   const subscriptionsMonthly = monthlyTotal(groups.subscriptions);
@@ -50,7 +53,12 @@ export default function Commitments({
 
   const recurringRows = (items: RecurringItem[]) =>
     items.map((item) => (
-      <RecurringRow key={item.rule.id} item={item} onOpen={() => setModal({ type: "recurrence", item: item.rule })} />
+      <RecurringRow
+        key={item.rule.id}
+        item={item}
+        cardName={data.cards.find(({ id }) => id === item.rule.cardId)?.name}
+        onOpen={() => setModal({ type: "recurrence", item: item.rule })}
+      />
     ));
 
   return (
@@ -254,15 +262,19 @@ function Section({
   );
 }
 
-function RecurringRow({ item, onOpen }: { item: RecurringItem; onOpen: () => void }) {
+function RecurringRow({ item, cardName, onOpen }: { item: RecurringItem; cardName?: string; onOpen: () => void }) {
   const { rule, pending, started } = item;
   const income = rule.kind === "income";
   const status = !started
     ? `Começa em ${monthName(rule.startMonth)}`
     : pending
-      ? `${income ? "Entra" : "Vence"} ${dateLabel(pending.date)}`
-      : income ? "Recebido neste mês" : "Pago neste mês";
-  const detail = [status, rule.endMonth && `até ${shortMonth(rule.endMonth)}`].filter(Boolean).join(" · ");
+      ? `${income ? "Entra" : rule.cardId ? "Cobra" : "Vence"} ${dateLabel(pending.date)}`
+      : income ? "Recebido neste mês" : rule.cardId ? "Lançado na fatura" : "Pago neste mês";
+  const detail = [
+    rule.cardId && (cardName ? cardLabel(cardName) : "Cartão excluído"),
+    status,
+    rule.endMonth && `até ${shortMonth(rule.endMonth)}`,
+  ].filter(Boolean).join(" · ");
   const amount = money(Math.abs(rule.amount));
   return (
     <button

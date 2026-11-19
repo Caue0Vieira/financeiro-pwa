@@ -49,6 +49,8 @@ test("the month breakdown adds up to what is left to pay", () => {
     entry("netflix", -4490, { recurrenceId: "netflix", category: "Assinaturas" }),
     entry("luz", -16340),
     entry("compra", -9990, { cardId: "c" }),
+    // Charged on a card: already inside that card's invoice, so not counted again as a subscription.
+    entry("spotify", -2190, { recurrenceId: "spotify", category: "Assinaturas", cardId: "c" }),
     entry("bonus", 50000),
   ];
   const invoices = [{ cardId: "c", month: "2026-11", total: 30000, paid: 10000 }, { cardId: "d", month: "2026-11", total: 500, paid: 900 }];

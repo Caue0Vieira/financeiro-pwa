@@ -350,7 +350,7 @@
   width: 54px;
   height: 54px;
   border-radius: 50%;
-  background: #075743;
+  background: color-mix(in srgb, var(--a-900) 80%, var(--a-700));
   font-size: .83rem !important;
 }
 .profile-menu { padding-block: 2px; }

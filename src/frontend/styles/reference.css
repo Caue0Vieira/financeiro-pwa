@@ -111,7 +111,7 @@
 }
 
 .profile-budget { background: linear-gradient(150deg, #00302f, #015a44 59%, #037b4f 100%); }
-.profile-budget-ring > strong { background: #075743; }
+.profile-budget-ring > strong { background: color-mix(in srgb, var(--a-900) 80%, var(--a-700)); }
 .profile-reminders { padding-left: 18px; color: var(--page-muted); font-size: .84rem; }
 [data-page="profile"] .profile-section + .profile-section, [data-page="profile"] .profile-link, [data-page="profile"] .profile-link + .profile-section { border-color: var(--ref-line); }
 

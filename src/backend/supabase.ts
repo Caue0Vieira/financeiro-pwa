@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
 import { invoiceDates, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
+import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import type {
   BankConnections,
   FinanceService,
@@ -406,6 +407,7 @@ export function createSupabaseService(
         goals,
         batches,
         rules,
+        recurring_rows,
         rows,
         invoice_rows,
         invoices,
@@ -419,6 +421,7 @@ export function createSupabaseService(
         | "goals"
         | "batches"
         | "rules"
+        | "recurring_rows"
         | "rows"
         | "invoice_rows"
         | "invoices"
@@ -427,29 +430,40 @@ export function createSupabaseService(
         any[]
       >;
       const entries: Entry[] = rows.map(entry);
+      const period = month.slice(0, 7);
+      const cardDays = new Map<string, CardDays>(
+        cards.map((c: any) => [c.id, { closingDay: c.closing_day ?? null, dueDay: c.due_day ?? null }]),
+      );
+      // Charges already recorded as transactions, by rule and month; the RPC adds the two months before.
+      const recorded = new Set([
+        ...entries.filter((e) => e.recurrenceId).map((e) => `${e.recurrenceId}:${e.date.slice(0, 7)}`),
+        ...(recurring_rows ?? []).map((x: any) => `${x.recurring_rule_id}:${String(x.occurred_on).slice(0, 7)}`),
+      ]);
+      const ruleCharge = (r: any, date: string): Entry => ({
+        id: `recurrence:${r.id}:${date.slice(0, 7)}`,
+        date,
+        description: r.description,
+        amount: Number(r.amount_cents),
+        kind: r.kind,
+        category: r.category,
+        status: "planned",
+        source: "recurrence",
+        recurrenceId: r.id,
+        // Charged on a card: billed in the invoice its date falls into, by the card's closing day.
+        ...(r.card_id ? { cardId: r.card_id, invoiceMonth: chargeInvoiceMonth(date, cardDays.get(r.card_id)) } : {}),
+      });
+      // Card charges from earlier months (after their closing day) that are billed in this month's invoice.
+      const earlierCardCharges: Entry[] = [];
       for (const r of rules) {
-        if (
-          r.starts_on >= monthEnd(month) ||
-          (r.ends_on && r.ends_on < first(month)) ||
-          entries.some((e) => e.recurrenceId === r.id)
-        )
-          continue;
-        const last = new Date(`${monthEnd(month)}T00:00:00Z`);
-        last.setUTCDate(0);
-        const date = `${month.slice(0, 7)}-${String(Math.min(r.day_of_month, last.getUTCDate())).padStart(2, "0")}`;
-        entries.push({
-          id: `recurrence:${r.id}:${month}`,
-          date,
-          description: r.description,
-          amount: Number(r.amount_cents),
-          kind: r.kind,
-          category: r.category,
-          status: "planned",
-          source: "recurrence",
-          recurrenceId: r.id,
-          // A rule charged on a card joins this month's invoice of that card.
-          ...(r.card_id ? { cardId: r.card_id, invoiceMonth: month.slice(0, 7) } : {}),
-        });
+        const rule = { startMonth: r.starts_on, endMonth: r.ends_on ?? undefined, day: r.day_of_month };
+        const date = chargeDate(rule, period);
+        if (date && !recorded.has(`${r.id}:${period}`)) entries.push(ruleCharge(r, date));
+        if (!r.card_id) continue;
+        for (const earlier of chargesInInvoice(rule, cardDays.get(r.card_id), period)) {
+          if (earlier.slice(0, 7) < period && !recorded.has(`${r.id}:${earlier.slice(0, 7)}`)) {
+            earlierCardCharges.push(ruleCharge(r, earlier));
+          }
+        }
       }
       const sum = (items: Entry[]) => items.reduce((a, e) => a + e.amount, 0);
       const confirmed = entries.filter((e) => e.status === "confirmed");
@@ -486,10 +500,11 @@ export function createSupabaseService(
           e.category,
           (categoryMap.get(e.category) ?? 0) - e.amount,
         );
-      // Card charges of recurring rules not yet recorded this month still count in the invoice.
+      // Card charges of recurring rules not recorded yet still count in the invoice they are billed in.
       const invoiceEntries: Entry[] = [
         ...invoice_rows.map(entry),
-        ...entries.filter((e) => e.cardId && e.id.startsWith("recurrence:")),
+        ...entries.filter((e) => e.cardId && e.id.startsWith("recurrence:") && e.invoiceMonth === period),
+        ...earlierCardCharges,
       ];
       const invoiceList = cards.map((c: any) => {
         const i = invoices.find((x: any) => x.card_id === c.id);

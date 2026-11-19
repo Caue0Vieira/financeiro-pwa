@@ -22,6 +22,11 @@ const parts: { id: keyof MonthBreakdown; label: string }[] = [
   { id: "oneOff", label: "Outras contas" },
 ];
 
+const monthOnly = (month: string) =>
+  new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "");
+
 const shortMonth = (month: string) =>
   new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
     .toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
@@ -57,6 +62,7 @@ export default function Commitments({
         key={item.rule.id}
         item={item}
         cardName={data.cards.find(({ id }) => id === item.rule.cardId)?.name}
+        month={data.month}
         onOpen={() => setModal({ type: "recurrence", item: item.rule })}
       />
     ));
@@ -64,10 +70,10 @@ export default function Commitments({
   return (
     <>
       <PageHeading
-        title="Compromissos"
+        title="Contas a pagar"
         action={
           <button className="button" onClick={() => setModal({ type: "commitment" })}>
-            <Icon name="plus" size={16} /> Novo compromisso
+            <Icon name="plus" size={16} /> Nova conta
           </button>
         }
       />
@@ -262,7 +268,17 @@ function Section({
   );
 }
 
-function RecurringRow({ item, cardName, onOpen }: { item: RecurringItem; cardName?: string; onOpen: () => void }) {
+function RecurringRow({
+  item,
+  cardName,
+  month,
+  onOpen,
+}: {
+  item: RecurringItem;
+  cardName?: string;
+  month: string;
+  onOpen: () => void;
+}) {
   const { rule, pending, started } = item;
   const income = rule.kind === "income";
   const status = !started
@@ -270,9 +286,12 @@ function RecurringRow({ item, cardName, onOpen }: { item: RecurringItem; cardNam
     : pending
       ? `${income ? "Entra" : rule.cardId ? "Cobra" : "Vence"} ${dateLabel(pending.date)}`
       : income ? "Recebido neste mês" : rule.cardId ? "Lançado na fatura" : "Pago neste mês";
+  // After the closing day, the charge is billed in a later invoice: say which one.
+  const laterInvoice = pending?.invoiceMonth && pending.invoiceMonth !== month ? pending.invoiceMonth : undefined;
   const detail = [
     rule.cardId && (cardName ? cardLabel(cardName) : "Cartão excluído"),
     status,
+    laterInvoice && `fatura de ${monthOnly(laterInvoice)}`,
     rule.endMonth && `até ${shortMonth(rule.endMonth)}`,
   ].filter(Boolean).join(" · ");
   const amount = money(Math.abs(rule.amount));

@@ -58,6 +58,18 @@ export default function Editor({
   const [kind, setKind] = useState<EntryKind>(
     type === "entry" ? (modal.item?.kind ?? modal.kind ?? "expense") : "expense",
   );
+  // Bills and subscriptions still charged on the card being edited; deleting it moves them to the account.
+  const cardRecurrences =
+    type === "card" && item
+      ? data.recurrences
+          .filter(({ cardId, endMonth }) => cardId === item.id && (!endMonth || endMonth >= month))
+          .map(({ description }) => description)
+      : [];
+  const movedToAccount = cardRecurrences.length
+    ? ` ${new Intl.ListFormat("pt-BR").format(cardRecurrences)} ${
+        cardRecurrences.length === 1 ? "passa a ser pago" : "passam a ser pagos"
+      } pela conta a partir deste mês.`
+    : "";
   // Cards a recurring bill can be charged on; keeps the current one even if it was deleted.
   const recurrenceCards =
     type === "recurrence" ? data.cards.filter(({ id, archived }) => !archived || id === item?.cardId) : [];
@@ -557,7 +569,7 @@ export default function Editor({
                     placeholder="Ex.: 10"
                   />
                   <p className="form-hint full">
-                    Esses dias se repetem todo mês. Para mudar só um mês, use Compromissos → Faturas do cartão.
+                    Esses dias se repetem todo mês. Para mudar só um mês, use Contas a pagar → Faturas do cartão.
                   </p>
                   {linkedCard && (
                     <details className="form-details full">
@@ -774,7 +786,7 @@ export default function Editor({
               {type === "recurrence"
                 ? "Encerrar esta recorrência neste mês?"
                 : type === "card"
-                  ? "Excluir este cartão? As compras e faturas registradas continuam no histórico."
+                  ? `Excluir este cartão? As compras e faturas registradas continuam no histórico.${movedToAccount}`
                   : "Excluir este item? Esta ação não pode ser desfeita."}
             </p>
             <button

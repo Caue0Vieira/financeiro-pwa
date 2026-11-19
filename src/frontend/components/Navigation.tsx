@@ -10,7 +10,7 @@ export const workspace = [
   { id: "activity", label: "Transações", icon: "activity" },
   { id: "analytics", label: "Orçamento e Análise", icon: "budget" },
   { id: "cards", label: "Cartões", icon: "card" },
-  { id: "commitments", label: "Compromissos", icon: "receipt" },
+  { id: "commitments", label: "Contas a pagar", icon: "receipt" },
   { id: "investments", label: "Investimentos", icon: "chart" },
   { id: "goals", label: "Metas", icon: "goal" },
 ] as const;

@@ -175,13 +175,13 @@ export default function Dashboard({
             <header className="panel-head">
               <h2>Próximos vencimentos</h2>
               <button className="text-button" onClick={() => navigate("commitments")}>
-                Ver compromissos <Icon name="arrowRight" size={15} />
+                Ver contas a pagar <Icon name="arrowRight" size={15} />
               </button>
             </header>
             <Entries
               entries={data.upcoming.slice(0, 3)}
               onEdit={editEntry}
-              empty="Nenhum compromisso previsto neste mês."
+              empty="Nenhuma conta prevista neste mês."
             />
           </section>
         </aside>

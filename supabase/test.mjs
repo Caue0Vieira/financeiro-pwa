@@ -143,7 +143,18 @@ assert.equal((await db.query("select card_id from public.pluggy_accounts")).rows
 await assert.rejects(() => db.query("delete from public.pluggy_items where item_id='item-1' returning item_id").then(({ rows }) => { if (!rows.length) throw new Error('no rows'); }));
 await assert.rejects(() => db.query("select * from public.pluggy_events"));
 assert.equal((await db.query("select source from public.transactions where external_id='tx-1'")).rows[0].source, 'pluggy');
+const thisMonth=(await db.query("select date_trunc('month', now() at time zone 'America/Sao_Paulo')::date::text as m")).rows[0].m;
+const runningOnCard=(await db.query("select public.save_recurrence($1::jsonb,null) as id",[JSON.stringify({description:'Academia',amount:-9900,kind:'expense',category:'Saúde',startMonth:'2026-01-01',day:5,cardId:card})])).rows[0].id;
+const futureOnCard=(await db.query("select public.save_recurrence($1::jsonb,null) as id",[JSON.stringify({description:'Curso',amount:-20000,kind:'expense',category:'Educação',startMonth:'2099-01-01',day:5,cardId:card})])).rows[0].id;
+await db.query("insert into public.transactions(card_id,occurred_on,invoice_month,description,amount_cents,kind,category,source,recurring_rule_id) values ($1,'2026-01-05','2026-01-01','Academia',-9900,'expense','Saúde','recurring',$2)",[card,runningOnCard]);
+const windowDashboard=(await db.query("select public.monthly_dashboard('2026-03-01') as value")).rows[0].value;
+assert.ok(windowDashboard.recurring_rows.some(r=>r.recurring_rule_id===runningOnCard && r.occurred_on==='2026-01-05'));
+assert.ok(windowDashboard.rules.some(r=>r.description==='Streaming' && r.ends_on==='2026-02-28'));
 await db.query("update public.cards set archived=true where id=$1", [card]);
+const academia=(await db.query("select starts_on::text,ends_on::text,card_id from public.recurring_rules where description='Academia' order by starts_on")).rows;
+assert.deepEqual(academia.map(r=>[r.starts_on,r.card_id]),[['2026-01-01',card],[thisMonth,null]]);
+assert.equal(academia[0].ends_on,(await db.query("select ($1::date - 1)::text as d",[thisMonth])).rows[0].d);
+assert.equal((await db.query('select card_id from public.recurring_rules where id=$1',[futureOnCard])).rows[0].card_id,null);
 const archivedDashboard = (await db.query("select public.monthly_dashboard('2026-01-01') as value")).rows[0].value;
 assert.equal(archivedDashboard.cards.find(item => item.id === card)?.archived, true);
 assert.equal(archivedDashboard.cards.find(item => item.id === dueCard)?.archived, false);

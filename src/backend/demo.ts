@@ -1,6 +1,7 @@
 import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
+import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();
@@ -88,18 +89,35 @@ export function createDemoService(): FinanceService {
     installmentNumber: 7, installmentCount: 10, status: 'planned',
   });
 
+  const recorded = (ruleId: string, month: string) =>
+    entries.some((entry) => entry.recurrenceId === ruleId && entry.date.slice(0, 7) === month);
+  const ruleCharge = (rule: Recurrence, date: string): Entry => ({
+    id: `previsto:${rule.id}:${date.slice(0, 7)}`, date, description: rule.description,
+    recurrenceId: rule.id, category: rule.category, amount: rule.amount, kind: rule.kind, status: 'planned', source: 'recurrence',
+    // Charged on a card: billed in the invoice its date falls into, by the card's closing day.
+    ...(rule.cardId
+      ? { cardId: rule.cardId, invoiceMonth: chargeInvoiceMonth(date, cards.find(({ id }) => id === rule.cardId)) }
+      : {}),
+  });
+
   function items(period: string) {
     const result = entries.filter((entry) => (entry.invoiceMonth ?? entry.date.slice(0, 7)) === period);
     for (const rule of recurrences) {
-      if (period < rule.startMonth || (rule.endMonth && period > rule.endMonth)) continue;
-      if (result.some((entry) => entry.recurrenceId === rule.id)) continue;
-      result.push({
-        id: `previsto:${rule.id}:${period}`, date: dateInMonth(period, rule.day), description: rule.description,
-        recurrenceId: rule.id, category: rule.category, amount: rule.amount, kind: rule.kind, status: 'planned', source: 'recurrence',
-        ...(rule.cardId ? { cardId: rule.cardId, invoiceMonth: period } : {}),
-      });
+      const date = chargeDate(rule, period);
+      if (date && !recorded(rule.id, period)) result.push(ruleCharge(rule, date));
     }
     return result.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }
+
+  /** What a card's invoice due in `period` holds, including recurring charges from earlier months. */
+  function invoiceItems(period: string, card: Card) {
+    const stored = entries.filter((entry) => entry.cardId === card.id && (entry.invoiceMonth ?? entry.date.slice(0, 7)) === period);
+    const charges = recurrences
+      .filter((rule) => rule.cardId === card.id)
+      .flatMap((rule) => chargesInInvoice(rule, card, period)
+        .filter((date) => !recorded(rule.id, date.slice(0, 7)))
+        .map((date) => ruleCharge(rule, date)));
+    return [...stored, ...charges];
   }
 
   function invoices(period: string): Invoice[] {
@@ -107,7 +125,7 @@ export function createDemoService(): FinanceService {
       cardId: card.id,
       month: period,
       ...invoiceDates(period, card.closingDay, card.dueDay, invoiceDateOverrides.get(`${card.id}:${period}`)),
-      total: items(period).filter((entry) => entry.cardId === card.id).reduce((sum, entry) => sum - entry.amount, 0),
+      total: invoiceItems(period, card).reduce((sum, entry) => sum - entry.amount, 0),
       paid: allocations.filter((item) => item.cardId === card.id && item.month === period).reduce((sum, item) => sum + item.amount, 0),
     })).filter((invoice) => invoice.total !== 0 || invoice.paid !== 0);
   }
@@ -217,6 +235,15 @@ export function createDemoService(): FinanceService {
           const card = cards.find((item) => item.id === action.id);
           if (!card) throw new Error('Cartão não encontrado.');
           put(cards, { ...card, archived: true });
+          // Same as the database: from this month on, the account pays what was charged on the card.
+          const thisMonth = currentMonth();
+          for (const rule of recurrences.filter((item) => item.cardId === card.id)) {
+            if (rule.startMonth >= thisMonth) put(recurrences, { ...rule, cardId: undefined });
+            else if (!rule.endMonth || rule.endMonth >= thisMonth) {
+              put(recurrences, { ...rule, endMonth: shiftMonth(thisMonth, -1) });
+              recurrences.push({ ...rule, id: crypto.randomUUID(), startMonth: thisMonth, cardId: undefined });
+            }
+          }
           return;
         }
         case 'saveInvestment': {

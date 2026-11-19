@@ -41,3 +41,14 @@ export function invoiceDates(
   const closingDate = override?.closingDate ?? (closingDay === null ? null : dateInMonth(closingMonth, closingDay));
   return { closingDate, dueDate, adjusted: Boolean(override?.closingDate || override?.dueDate) };
 }
+
+/**
+ * Month (YYYY-MM) of the invoice a card charge on `date` falls into, i.e. the month it is due:
+ * charges up to the closing day join the invoice that closes then, later ones the next.
+ * Matches invoiceDates(); null when the card lacks either day.
+ */
+export function invoiceMonthOf(date: string, closingDay: number | null, dueDay: number | null) {
+  if (closingDay === null || dueDay === null) return null;
+  const shift = (closingDay < dueDay ? 0 : 1) + (Number(date.slice(8, 10)) > closingDay ? 1 : 0);
+  return shiftMonth(date.slice(0, 7), shift);
+}

@@ -1,3 +1,5 @@
+import { invoiceMonthOf } from "../date.ts";
+
 /** Pure mapping of Pluggy accounts and transactions to app rows. No I/O, so it is unit tested. */
 
 export type PluggyAccount = {
@@ -47,20 +49,13 @@ export function saoPauloDate(iso: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : saoPaulo.format(new Date(iso));
 }
 
-const monthStart = (year: number, monthIndex: number) =>
-  new Date(Date.UTC(year, monthIndex, 1)).toISOString().slice(0, 10);
-
 /**
  * First day of the month whose invoice a purchase falls into (the month the invoice is due),
  * matching invoiceDates() in src/date.ts: closes before the due day → due the same month.
  */
 export function invoiceMonthFor(date: string, closingDay: number | null, dueDay: number | null) {
-  if (closingDay === null || dueDay === null) return null;
-  const [year, month, day] = date.split("-").map(Number);
-  const closesInDueMonth = closingDay < dueDay;
-  const afterClosing = day > closingDay;
-  const shift = (closesInDueMonth ? 0 : 1) + (afterClosing ? 1 : 0);
-  return monthStart(year, month - 1 + shift);
+  const month = invoiceMonthOf(date, closingDay, dueDay);
+  return month && `${month}-01`;
 }
 
 /** Banks as the app names them (src/frontend/components/BankIcon.tsx), found in account names. */

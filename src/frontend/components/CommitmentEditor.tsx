@@ -113,10 +113,10 @@ export default function CommitmentEditor({
   const current = modes.find(({ id }) => id === mode)!;
 
   return (
-    <Overlay title="Novo compromisso" onClose={close}>
+    <Overlay title="Nova conta a pagar" onClose={close}>
       <form onSubmit={submit} onChange={() => setModeError("")}>
         <div className="form-grid commitment-form">
-          <div className="commitment-types full" role="radiogroup" aria-label="Tipo de compromisso">
+          <div className="commitment-types full" role="radiogroup" aria-label="Tipo de conta">
             {modes.map(({ id, label, hint, icon }) => (
               <button
                 type="button"

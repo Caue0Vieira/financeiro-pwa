@@ -19,6 +19,7 @@ import Planning from "./pages/Planning";
 import Profile from "./pages/Profile";
 import { ThemeToggle } from "./components/ThemeToggle";
 import type { EditModal, FinanceCommands, Page } from "./types";
+import { isSubscription } from "./commitments";
 import "./styles/app.css";
 import "./styles/screens.css";
 import "./styles/dashboard.css";
@@ -125,7 +126,9 @@ export default function FinanceApp({
     setModal(undefined);
     const message = action.type === "archiveCard" ? "Cartão excluído."
       : action.type === "saveCard" && !action.card.id ? "Cartão cadastrado."
-      : savedMonth ? "Compromisso salvo." : "Alterações salvas.";
+      : action.type === "addInstallments" ? "Compra parcelada salva."
+      : action.type === "saveRecurrence" && !action.recurrence.id && isSubscription(action.recurrence.category) ? "Assinatura salva."
+      : savedMonth ? "Conta salva." : "Alterações salvas.";
     showNotice(message);
     try {
       if (savedMonth && savedMonth !== month) onMonth(savedMonth);
@@ -252,7 +255,7 @@ export default function FinanceApp({
                   aria-label={
                     invoiceAlerts.length
                       ? `Notificações (${invoiceAlerts.length} faturas a pagar)`
-                      : "Notificações e compromissos"
+                      : "Notificações e contas a pagar"
                   }
                   onClick={() => navigate("commitments")}
                 >

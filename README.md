@@ -71,7 +71,7 @@ No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adi
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.
 - Para a fatura CSV, selecione o apelido do cartão, o mês com vencimento e o mapeamento das colunas. Revise os vínculos sugeridos com parcelas existentes.
-- Cadastre cartões em **Cartões**, com um banco ou como avulsos. Em **Compromissos → Faturas do cartão → Vincular pagamento**, associe os pagamentos do extrato. O indicador **A pagar** acompanha o saldo restante.
+- Cadastre cartões em **Cartões**, com um banco ou como avulsos. Em **Contas a pagar → Faturas do cartão → Vincular pagamento**, associe os pagamentos do extrato. O indicador **A pagar** acompanha o saldo restante.
 
 O arquivo original é lido no navegador. Após você confirmar, só os lançamentos revisados e os metadados necessários à deduplicação e cobertura são enviados ao Supabase.
 

@@ -225,7 +225,7 @@ export default function Profile({
                 <p className="subtle">Nenhum vencimento previsto.</p>
               )}
               <button className="text-button" onClick={() => navigate("commitments")}>
-                Ver compromissos
+                Ver contas a pagar
               </button>
             </ProfileSection>
             <ProfileSection title="Ajuda e suporte" icon="help">

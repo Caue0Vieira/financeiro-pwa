@@ -134,24 +134,31 @@
 @media (hover: hover) and (pointer: fine) {
   .planning-tabs button:hover { background: var(--accent-soft); }
 }
-.planning-panels { touch-action: pan-y pinch-zoom; overflow-x: clip; overflow-clip-margin: 24px; }
-/* The panel enters from the side of its tab: Orçamento from the left, Análise from the right. */
-.planning-panel[data-tab="budget"] { --tab-offset: -32px; }
-.planning-panel[data-tab="analytics"] { --tab-offset: 32px; }
-@media (prefers-reduced-motion: no-preference) {
-  .planning-panels[data-switched="true"] .planning-panel:not([hidden]) {
-    animation:
-      planning-slide var(--spring-ms, 520ms) var(--spring, cubic-bezier(.32, .72, 0, 1)) both,
-      planning-fade 260ms ease-out both;
-  }
+/* Both panels sit side by side in a track that follows the finger (transform only)
+   and springs to the selected tab. */
+.planning-panels {
+  --panel-bleed: 24px;
+  touch-action: pan-y pinch-zoom;
+  overflow-x: clip;
+  margin-inline: calc(-1 * var(--panel-bleed));
 }
-@keyframes planning-slide {
-  from { transform: translateX(var(--tab-offset)); }
-  to { transform: translateX(0); }
+.planning-track {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  will-change: transform;
 }
-@keyframes planning-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.planning-panel {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding-inline: var(--panel-bleed);
+  outline-offset: -2px;
+}
+/* At rest the off-screen panel takes no height, so the page only scrolls the visible one. */
+.planning-panels:not([data-moving]) .planning-panel:not([data-active]) {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
 }
 .period-tabs { display: flex; width: min(100%, 530px); margin-bottom: 16px; }
 .period-tabs button { flex: 1; padding-inline: 6px; }
@@ -369,7 +376,8 @@
 .button.profile-signout { margin: 0; width: 100%; color: var(--accent); background: var(--accent-soft); }
 
 @media (max-width: 820px) {
-  .planning-panels { min-block-size: 56svh; }
+  /* Bleed stays inside the page padding (≥ 11px) so the clip never widens the page. */
+  .planning-panels { min-block-size: 56svh; --panel-bleed: 10px; }
   .app-shell { background: linear-gradient(var(--mobile-top), var(--mobile-surface) 230px); }
   .main { padding: max(12px, env(safe-area-inset-top)) 16px calc(86px + env(safe-area-inset-bottom)); }
   .topbar { display: none; }

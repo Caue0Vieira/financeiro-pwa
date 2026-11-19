@@ -1,5 +1,5 @@
-import { motion } from "motion/react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { animate, motion, useMotionValue, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import type { Dashboard, FinanceService } from "../../contracts";
 import { HeaderMenu, PageHeading } from "../components/common";
 import { iosSpring } from "../motion/liquid";
@@ -12,6 +12,22 @@ const tabs = [
   { id: "analytics", label: "Análise" },
 ] as const;
 type Tab = (typeof tabs)[number]["id"];
+
+/** Finger travel before deciding between a horizontal swipe and a vertical scroll. */
+const slop = 10;
+/** Release speed (px/ms) that switches tabs even on a short swipe. */
+const flick = 0.35;
+
+type Drag = {
+  pointer: number;
+  x: number;
+  y: number;
+  locked: boolean;
+  base: number;
+  lastX: number;
+  lastT: number;
+  velocity: number;
+};
 
 export default function Planning({
   data,
@@ -27,21 +43,89 @@ export default function Planning({
   onViewTransactions: () => void;
 }) {
   const id = useId();
+  const reduceMotion = useReducedMotion();
   const [selected, setSelected] = useState<Tab>("budget");
   const [openedAnalytics, setOpenedAnalytics] = useState(false);
+  const [moving, setMoving] = useState(false);
   const tabButtons = useRef<Record<Tab, HTMLButtonElement | null>>({ budget: null, analytics: null });
-  const start = useRef<{ pointer: number; x: number; y: number }>(undefined);
+  const track = useRef<HTMLDivElement>(null);
+  const drag = useRef<Drag>(undefined);
   const swiped = useRef(false);
+  const slide = useRef<AnimationPlaybackControls>(undefined);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const x = useMotionValue(0);
 
-  function selectTab(tab: Tab, focus = false) {
+  /** Distance between the two panels (panel width + gap). */
+  const step = () => {
+    const panels = track.current?.children;
+    if (!panels || panels.length < 2) return 0;
+    return (panels[1] as HTMLElement).offsetLeft - (panels[0] as HTMLElement).offsetLeft;
+  };
+  const offsetOf = (tab: Tab) => (tab === "budget" ? 0 : -step());
+
+  useLayoutEffect(() => {
+    x.set(offsetOf(selectedRef.current));
+    const element = track.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      if (!slide.current && !drag.current?.locked) x.set(offsetOf(selectedRef.current));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => () => slide.current?.stop(), []);
+
+  function settle(tab: Tab, velocity = 0) {
+    slide.current?.stop();
+    const target = offsetOf(tab);
+    if (reduceMotion || x.get() === target) {
+      slide.current = undefined;
+      x.set(target);
+      setMoving(false);
+      return;
+    }
+    setMoving(true);
+    const controls = animate(x, target, {
+      ...iosSpring,
+      velocity,
+      restDelta: 0.5,
+      onComplete: () => {
+        if (slide.current !== controls) return;
+        slide.current = undefined;
+        setMoving(false);
+      },
+    });
+    slide.current = controls;
+  }
+
+  function selectTab(tab: Tab, focus = false, velocity = 0) {
     const button = tabButtons.current[tab];
     if (focus) button?.focus({ preventScroll: true });
+    settle(tab, velocity);
     if (selected === tab) return;
     if (tab === "analytics") setOpenedAnalytics(true);
     setSelected(tab);
     if (button && button.getBoundingClientRect().top < 0) {
       button.scrollIntoView({ block: "start", behavior: "instant" });
     }
+  }
+
+  function release(event: PointerEvent<HTMLDivElement>, cancelled: boolean) {
+    const current = drag.current;
+    if (current?.pointer !== event.pointerId) return;
+    drag.current = undefined;
+    if (!current.locked) return;
+    swiped.current = !cancelled;
+    const width = step() || 1;
+    const progress = -x.get() / width;
+    let next: Tab;
+    if (cancelled) next = selected;
+    else if (Math.abs(current.velocity) > flick) next = current.velocity < 0 ? "analytics" : "budget";
+    else next = progress > 0.5 ? "analytics" : "budget";
+    selectTab(next, event.currentTarget.contains(document.activeElement), current.velocity * 1000);
   }
 
   const tabId = (tab: Tab) => `${id}-tab-${tab}`;
@@ -101,26 +185,63 @@ export default function Planning({
       </div>
       <div
         className="planning-panels"
-        data-switched={openedAnalytics}
+        data-moving={moving || undefined}
         onPointerDown={(event) => {
           swiped.current = false;
           if (!event.isPrimary || event.pointerType === "mouse") {
-            start.current = undefined;
+            drag.current = undefined;
             return;
           }
-          start.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
+          drag.current = {
+            pointer: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            locked: false,
+            base: 0,
+            lastX: event.clientX,
+            lastT: event.timeStamp,
+            velocity: 0,
+          };
         }}
-        onPointerCancel={() => { start.current = undefined; }}
-        onPointerUp={(event) => {
-          const origin = start.current;
-          start.current = undefined;
-          if (origin?.pointer !== event.pointerId) return;
-          const dx = event.clientX - origin.x;
-          const dy = event.clientY - origin.y;
-          if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-          swiped.current = true;
-          selectTab(dx < 0 ? "analytics" : "budget", event.currentTarget.contains(document.activeElement));
+        onPointerMove={(event) => {
+          const current = drag.current;
+          if (current?.pointer !== event.pointerId) return;
+          const dx = event.clientX - current.x;
+          if (!current.locked) {
+            const dy = event.clientY - current.y;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < slop) return;
+            if (Math.abs(dx) < Math.abs(dy) * 1.2) {
+              drag.current = undefined;
+              return;
+            }
+            current.locked = true;
+            current.base = x.get() - dx;
+            slide.current?.stop();
+            slide.current = undefined;
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // The pointer may already be gone; the drag still works without capture.
+            }
+            setOpenedAnalytics(true);
+            setMoving(true);
+          }
+          const elapsed = event.timeStamp - current.lastT;
+          if (elapsed > 0) {
+            const instant = (event.clientX - current.lastX) / elapsed;
+            current.velocity = current.velocity * 0.3 + instant * 0.7;
+          }
+          current.lastX = event.clientX;
+          current.lastT = event.timeStamp;
+          // Follows the finger; resists past the first and last tab.
+          const min = -step();
+          let next = current.base + dx;
+          if (next > 0) next *= 0.35;
+          else if (next < min) next = min + (next - min) * 0.35;
+          x.set(next);
         }}
+        onPointerUp={(event) => release(event, false)}
+        onPointerCancel={(event) => release(event, true)}
         onClickCapture={(event) => {
           if (!swiped.current || event.detail === 0) return;
           swiped.current = false;
@@ -128,29 +249,32 @@ export default function Planning({
           event.stopPropagation();
         }}
       >
-        {tabs.map(({ id: tab }) => (
-          <div
-            key={tab}
-            className="planning-panel"
-            data-tab={tab}
-            role="tabpanel"
-            id={panelId(tab)}
-            aria-labelledby={tabId(tab)}
-            tabIndex={0}
-            hidden={selected !== tab}
-          >
-            {tab === "budget" ? (
-              <Budget data={data} openEditor={openEditor} />
-            ) : openedAnalytics && (
-              <Analytics
-                month={data.month}
-                revision={data}
-                analyze={analyze}
-                onViewTransactions={onViewTransactions}
-              />
-            )}
-          </div>
-        ))}
+        <motion.div ref={track} className="planning-track" style={{ x }}>
+          {tabs.map(({ id: tab }) => (
+            <div
+              key={tab}
+              className="planning-panel"
+              data-tab={tab}
+              data-active={selected === tab || undefined}
+              role="tabpanel"
+              id={panelId(tab)}
+              aria-labelledby={tabId(tab)}
+              tabIndex={selected === tab ? 0 : -1}
+              inert={selected !== tab}
+            >
+              {tab === "budget" ? (
+                <Budget data={data} openEditor={openEditor} />
+              ) : openedAnalytics && (
+                <Analytics
+                  month={data.month}
+                  revision={data}
+                  analyze={analyze}
+                  onViewTransactions={onViewTransactions}
+                />
+              )}
+            </div>
+          ))}
+        </motion.div>
       </div>
     </>
   );

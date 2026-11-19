@@ -1,4 +1,4 @@
-import { bindings, defineConfig } from 'cf/config';
+import { bindings, defineConfig, triggers } from 'cf/config';
 import * as entrypoint from './src/worker/index.ts' with { type: 'cf-worker' };
 
 export default defineConfig({
@@ -10,6 +10,8 @@ export default defineConfig({
     workersDev: true,
     previewUrls: false,
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*', '/manifest.webmanifest'] },
+    // Backup for the Pluggy webhook: imports what Pluggy already has for every connection.
+    triggers: [triggers.scheduled({ schedule: '0 */6 * * *' })],
     // Values are set in Cloudflare, never committed: see README → "Open Finance (Pluggy)".
     env: {
       SUPABASE_URL: bindings.secret(),

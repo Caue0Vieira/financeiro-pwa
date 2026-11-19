@@ -188,7 +188,39 @@ async function webhook(services: Services, request: Request, context: Context) {
   return json({ ok: true });
 }
 
+/**
+ * Cron backup for the webhook (see cloudflare.config.ts): imports what Pluggy already has for every
+ * stored connection, so purchases arrive even if a notification is lost. One failing item does
+ * not stop the others.
+ */
+async function syncEveryItem(services: Services) {
+  const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id");
+  if (error) throw error;
+  for (const { item_id, user_id } of data ?? []) {
+    await syncItem(services.db, services.pluggy, user_id, item_id, inferCategory)
+      .catch((failure) => console.error("pluggy scheduled sync", item_id, failure));
+  }
+}
+
+function servicesFor(env: Env): Services {
+  return {
+    env,
+    db: createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }),
+    pluggy: pluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET),
+  };
+}
+
+const configured = (env: Env) =>
+  Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
+
 export default {
+  async scheduled(_controller: unknown, env: Env, context: Context) {
+    if (!configured(env)) return;
+    context.waitUntil(syncEveryItem(servicesFor(env)));
+  },
+
   async fetch(request: Request, env: Env, context: Context): Promise<Response> {
     const { pathname } = new URL(request.url);
     // Needs no secrets, so it works before the Pluggy setup is done.
@@ -201,17 +233,11 @@ export default {
         },
       });
     }
-    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.PLUGGY_CLIENT_ID || !env.PLUGGY_CLIENT_SECRET) {
+    if (!configured(env)) {
       return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
     }
     try {
-      const services: Services = {
-        env,
-        db: createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        }),
-        pluggy: pluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET),
-      };
+      const services = servicesFor(env);
       const itemRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)$/);
       if (request.method === "POST" && pathname === "/api/pluggy/webhook") return await webhook(services, request, context);
       if (request.method === "POST" && pathname === "/api/pluggy/connect-token") return await connectToken(services, request);

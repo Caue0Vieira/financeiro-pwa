@@ -417,9 +417,9 @@
 .bank-connection-actions .subtle { font-size: .78rem; }
 .bank-connections .text-button { display: inline-flex; align-items: center; gap: 5px; }
 .bank-connections .danger-text { color: var(--danger); }
-.bank-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin-top: 10px; }
+.bank-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; margin-top: 10px; }
 .bank-link .field input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
-.bank-link-help { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: .8rem; text-align: start; }
+.bank-link-help { display: flex; align-items: center; gap: 5px; margin-top: 18px; font-size: .8rem; text-align: start; }
 
 /* Open Finance guide in Perfil → Ajuda e suporte. */
 .open-finance-guide { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
@@ -430,5 +430,5 @@
 .open-finance-guide .form-details summary { padding-block: 4px; }
 .open-finance-guide ol, .open-finance-guide ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: .86rem; line-height: 1.45; }
 .open-finance-guide .text-button { justify-self: start; display: inline-flex; align-items: center; gap: 5px; }
-.bank-connect-widget { margin: 6px 0 4px; font-size: .8rem; color: var(--muted); }
+.bank-connect-widget { display: flex; margin: 16px 0 4px; font-size: .8rem; color: var(--muted); }
 @media (max-width: 480px) { .bank-link { grid-template-columns: 1fr; } }

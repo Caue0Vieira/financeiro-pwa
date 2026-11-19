@@ -14,9 +14,11 @@ const tabs = [
 type Tab = (typeof tabs)[number]["id"];
 
 /** Finger travel before deciding between a horizontal swipe and a vertical scroll. */
-const slop = 10;
+const slop = 8;
 /** Release speed (px/ms) that switches tabs even on a short swipe. */
-const flick = 0.35;
+const flick = 0.3;
+/** Share of the width that switches tabs on a slow drag. */
+const distance = 0.2;
 
 type Drag = {
   pointer: number;
@@ -49,6 +51,7 @@ export default function Planning({
   const [moving, setMoving] = useState(false);
   const tabButtons = useRef<Record<Tab, HTMLButtonElement | null>>({ budget: null, analytics: null });
   const track = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag>(undefined);
   const swiped = useRef(false);
   const slide = useRef<AnimationPlaybackControls>(undefined);
@@ -77,6 +80,18 @@ export default function Planning({
   }, []);
 
   useEffect(() => () => slide.current?.stop(), []);
+
+  // Once the swipe is horizontal, keep the browser from taking the gesture over as a
+  // vertical scroll (which would cancel the pointer mid-swipe). Needs a non-passive listener.
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const onTouchMove = (event: TouchEvent) => {
+      if (drag.current?.locked && event.cancelable) event.preventDefault();
+    };
+    element.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => element.removeEventListener("touchmove", onTouchMove);
+  }, []);
 
   function settle(tab: Tab, velocity = 0) {
     slide.current?.stop();
@@ -113,19 +128,19 @@ export default function Planning({
     }
   }
 
-  function release(event: PointerEvent<HTMLDivElement>, cancelled: boolean) {
+  function release(event: PointerEvent<HTMLDivElement>) {
     const current = drag.current;
     if (current?.pointer !== event.pointerId) return;
     drag.current = undefined;
     if (!current.locked) return;
-    swiped.current = !cancelled;
-    const width = step() || 1;
-    const progress = -x.get() / width;
-    let next: Tab;
-    if (cancelled) next = selected;
-    else if (Math.abs(current.velocity) > flick) next = current.velocity < 0 ? "analytics" : "budget";
-    else next = progress > 0.5 ? "analytics" : "budget";
-    selectTab(next, event.currentTarget.contains(document.activeElement), current.velocity * 1000);
+    swiped.current = true;
+    // A finger that stopped before lifting carries no flick.
+    const velocity = event.timeStamp - current.lastT > 100 ? 0 : current.velocity;
+    const moved = (x.get() - offsetOf(selected)) / (step() || 1);
+    let next: Tab = selected;
+    if (velocity < -flick || (velocity <= flick && moved < -distance)) next = "analytics";
+    else if (velocity > flick || (velocity >= -flick && moved > distance)) next = "budget";
+    selectTab(next, event.currentTarget.contains(document.activeElement), velocity * 1000);
   }
 
   const tabId = (tab: Tab) => `${id}-tab-${tab}`;
@@ -184,6 +199,7 @@ export default function Planning({
         ))}
       </div>
       <div
+        ref={viewport}
         className="planning-panels"
         data-moving={moving || undefined}
         onPointerDown={(event) => {
@@ -210,7 +226,7 @@ export default function Planning({
           if (!current.locked) {
             const dy = event.clientY - current.y;
             if (Math.max(Math.abs(dx), Math.abs(dy)) < slop) return;
-            if (Math.abs(dx) < Math.abs(dy) * 1.2) {
+            if (Math.abs(dx) < Math.abs(dy)) {
               drag.current = undefined;
               return;
             }
@@ -240,8 +256,8 @@ export default function Planning({
           else if (next < min) next = min + (next - min) * 0.35;
           x.set(next);
         }}
-        onPointerUp={(event) => release(event, false)}
-        onPointerCancel={(event) => release(event, true)}
+        onPointerUp={release}
+        onPointerCancel={release}
         onClickCapture={(event) => {
           if (!swiped.current || event.detail === 0) return;
           swiped.current = false;

@@ -167,7 +167,6 @@
 ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) { z-index: 2; }
 /* Pause ambient motion so the snapshot is stable. */
-:root.theme-switching .app-shell::before,
 :root.theme-switching .home-card-art { animation-play-state: paused; }
 :root.theme-fading,
 :root.theme-fading *,
@@ -196,11 +195,9 @@
     radial-gradient(38rem 30rem at 22% 8%, var(--glow), transparent 70%),
     radial-gradient(34rem 34rem at 92% 38%, var(--cool-glow), transparent 70%),
     radial-gradient(30rem 24rem at 55% 108%, var(--glow-lavender), transparent 70%);
-  animation: lg-breathe 14s ease-in-out infinite alternate;
-}
-@keyframes lg-breathe {
-  from { opacity: .78; transform: scale(1) translate3d(0, 0, 0); }
-  to { opacity: 1; transform: scale(1.06) translate3d(-1.5%, 1%, 0); }
+  /* Static on purpose: animating this layer re-renders every blurred surface above it
+     (tab bar, sidebar) on every frame, even with the app idle. */
+  opacity: .9;
 }
 
 /* ——— Glass material ——— */
@@ -212,10 +209,17 @@
   border-color: transparent;
   background-color: var(--mat-regular);
   box-shadow: var(--specular), var(--shadow);
+  /* Stacking context for the rim/spotlight pseudo-elements (backdrop-filter used to give it). */
+  isolation: isolate;
+}
+/* Real backdrop blur only where something can scroll behind the surface. Surfaces in the page
+   flow only ever sit over the static app background, where blur(26px) saturate() is visually
+   a no-op but costs a full-surface GPU pass per frame while scrolling. */
+:root[data-theme] :is(.sidebar, .modal) {
+  background-color: var(--mat-thick);
   -webkit-backdrop-filter: var(--mat-blur);
   backdrop-filter: var(--mat-blur);
 }
-:root[data-theme] :is(.sidebar, .modal) { background-color: var(--mat-thick); }
 /* Fixed/top-layer surfaces already anchor their pseudo-elements. */
 :root[data-theme] :is(
   .panel, .top-pill, .top-user-pill, .month-switch, .invoice-alerts, .home-balance, .feature-card,
@@ -372,8 +376,7 @@
     inset 0 1px 0 #ffffff59,
     inset 0 0 0 1px #ffffff1f,
     0 24px 40px -16px var(--lg-art-glow);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  backdrop-filter: blur(12px) saturate(160%);
+  /* No backdrop-filter: it would re-blur the hero under the card on every frame of the float. */
   transform: rotate(-6deg);
   animation: lg-float 7s ease-in-out infinite;
 }
@@ -492,8 +495,6 @@
   background: var(--mat-regular);
   color: var(--accent);
   box-shadow: var(--specular), inset 0 0 0 1px var(--lg-chip-edge), 0 10px 24px -14px var(--lg-drop);
-  -webkit-backdrop-filter: var(--mat-blur);
-  backdrop-filter: var(--mat-blur);
 }
 :root[data-theme] .home-quick-actions button:first-child > span {
   background: var(--primary-gradient);
@@ -610,7 +611,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-theme] .app-shell::before,
   :root[data-theme] .home-card-art { animation: none; }
 }
 

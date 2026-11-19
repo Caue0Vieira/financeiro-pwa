@@ -21,7 +21,7 @@ Aplicativo pessoal para acompanhar receitas, despesas, faturas, investimentos e 
 - [`src/App.tsx`](src/App.tsx) gerencia sessão, seleção do backend e carregamento do painel. [`src/ui/`](src/ui/) contém as telas e os estilos principais.
 - [`src/contracts.ts`](src/contracts.ts) define os contratos usados por [`src/data/demo.ts`](src/data/demo.ts) e [`src/data/supabase.ts`](src/data/supabase.ts).
 - [`src/imports/`](src/imports/) contém a leitura e a revisão de extratos CSV e OFX e de faturas CSV. Use dados fictícios ao testar importações.
-- [`src/worker/`](src/worker/) é o Worker da Cloudflare que responde só a `/api/*`: integração com a Pluggy (Open Finance) e o webhook. Os segredos ficam na Cloudflare; veja a seção Open Finance do README.
+- [`src/worker/`](src/worker/) é o Worker da Cloudflare que responde só a `/api/*`: integração com a Pluggy (Open Finance) e o webhook, além da categorização automática ([`categorize.ts`](src/worker/categorize.ts): regras aprendidas das correções do usuário, tabela `category_rules` preenchida pelo gatilho `learn_category`, e Workers AI para o que sobra como "Sem categoria"). Os segredos ficam na Cloudflare; veja a seção Open Finance do README.
 - [`public/`](public/) contém o manifesto, o service worker e a página offline. [`supabase/migrations/`](supabase/migrations/) contém o esquema e as políticas de acesso.
 - Consulte [`supabase/README.md`](supabase/README.md) para mudanças em autenticação, migrações ou armazenamento. O frontend usa somente a URL e a chave publicável do Supabase. Mantenha os valores locais em `.env.local`, conforme [`.env.example`](.env.example).
 

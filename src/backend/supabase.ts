@@ -86,7 +86,7 @@ export function createSupabaseService(
   const api = async <T>(path: string, method = "POST", body?: unknown): Promise<T> => {
     const { data } = await db.auth.getSession();
     if (!data.session) throw new Error("Sessão encerrada");
-    const response = await fetch(`/api/pluggy/${path}`, {
+    const response = await fetch(path.startsWith("/") ? path : `/api/pluggy/${path}`, {
       method,
       headers: { authorization: `Bearer ${data.session.access_token}`, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -200,6 +200,8 @@ export function createSupabaseService(
         },
       });
       fail(error);
+      // Workers AI classifies what arrived as "Sem categoria"; the import does not wait for it.
+      if (data?.inserted) void api("/api/categorize").catch(() => undefined);
       return data;
     },
     async mutate(action: Action) {

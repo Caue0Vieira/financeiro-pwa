@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { inferCategory } from "../frontend/merchants";
 import manifestSource from "../../public/manifest.webmanifest?raw";
+import { categorizeEveryone, categorizePending, type Ai } from "./categorize";
 import { manifestFor } from "./manifest";
 import { mapTransaction, purchasesAreNegative } from "./mapping";
 import { PluggyError, pluggyClient, tokenHeader, validSignature, validToken, type Pluggy } from "./pluggy";
@@ -17,9 +17,20 @@ export type Env = {
   PLUGGY_CLIENT_ID: string;
   PLUGGY_CLIENT_SECRET: string;
   PLUGGY_WEBHOOK_SECRET: string;
+  /** Workers AI: classifies what no learned rule or merchant pattern covered. */
+  AI?: Ai;
 };
 type Context = { waitUntil(promise: Promise<unknown>): void };
 type Services = { env: Env; db: SupabaseClient; pluggy: Pluggy };
+
+/** Workers AI pass over the user's uncategorised expenses; never fails the caller. */
+const autoCategorize = ({ env, db }: Services, userId: string) =>
+  env.AI
+    ? categorizePending(db, env.AI, userId).catch((error) => {
+      console.error("ai categorize", userId, error);
+      return 0;
+    })
+    : Promise.resolve(0);
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -68,7 +79,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * (no clientUserId; the id is pasted in the app). Pluggy only returns items of this
  * application, and an item already linked to another user is refused below.
  */
-async function registerItem(services: Services, request: Request) {
+async function registerItem(services: Services, request: Request, context: Context) {
   const userId = await signedInUser(services, request);
   const { itemId } = await body(request);
   if (typeof itemId !== "string" || !uuid.test(itemId.trim())) throw new HttpError(400, "ID de conexão inválido.");
@@ -87,11 +98,13 @@ async function registerItem(services: Services, request: Request) {
       .insert({ user_id: userId, item_id: item.id, connector_name: item.connector.name, status: item.status ?? null });
     if (saved.error) throw saved.error;
   }
-  return json(await syncItem(services.db, services.pluggy, userId, item.id, inferCategory));
+  const result = await syncItem(services.db, services.pluggy, userId, item.id);
+  context.waitUntil(autoCategorize(services, userId));
+  return json(result);
 }
 
 /** "Sincronizar": asks the banks for fresh data (arrives by webhook) and imports what Pluggy has now. */
-async function syncAll(services: Services, request: Request) {
+async function syncAll(services: Services, request: Request, context: Context) {
   const userId = await signedInUser(services, request);
   const { data, error } = await services.db.from("pluggy_items").select("item_id").eq("user_id", userId);
   if (error) throw error;
@@ -99,9 +112,16 @@ async function syncAll(services: Services, request: Request) {
   for (const { item_id } of data ?? []) {
     // Meu Pluggy items refuse PATCH (they follow the original connection's daily sync); ignore.
     await services.pluggy.refreshItem(item_id).catch(() => undefined);
-    inserted += (await syncItem(services.db, services.pluggy, userId, item_id, inferCategory)).inserted;
+    inserted += (await syncItem(services.db, services.pluggy, userId, item_id)).inserted;
   }
+  context.waitUntil(autoCategorize(services, userId));
   return json({ inserted });
+}
+
+/** After a CSV/OFX import in the app: classifies what arrived without a category. */
+async function categorize(services: Services, request: Request) {
+  const userId = await signedInUser(services, request);
+  return json({ categorized: await autoCategorize(services, userId) });
 }
 
 async function removeItem(services: Services, request: Request, itemId: string) {
@@ -180,7 +200,8 @@ async function webhook(services: Services, request: Request, context: Context) {
       case "item/created":
       case "item/updated":
       case "transactions/created":
-        await syncItem(services.db, services.pluggy, userId, event.itemId!, inferCategory);
+        await syncItem(services.db, services.pluggy, userId, event.itemId!);
+        await autoCategorize(services, userId);
         break;
     }
     await services.db.from("pluggy_events").delete().lt("received_at", new Date(Date.now() - 30 * 86_400_000).toISOString());
@@ -197,8 +218,12 @@ async function syncEveryItem(services: Services) {
   const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id");
   if (error) throw error;
   for (const { item_id, user_id } of data ?? []) {
-    await syncItem(services.db, services.pluggy, user_id, item_id, inferCategory)
+    await syncItem(services.db, services.pluggy, user_id, item_id)
       .catch((failure) => console.error("pluggy scheduled sync", item_id, failure));
+  }
+  // Also covers CSV/OFX imports and anything a previous pass missed.
+  if (services.env.AI) {
+    await categorizeEveryone(services.db, services.env.AI).catch((failure) => console.error("ai scheduled categorize", failure));
   }
 }
 
@@ -241,8 +266,9 @@ export default {
       const itemRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)$/);
       if (request.method === "POST" && pathname === "/api/pluggy/webhook") return await webhook(services, request, context);
       if (request.method === "POST" && pathname === "/api/pluggy/connect-token") return await connectToken(services, request);
-      if (request.method === "POST" && pathname === "/api/pluggy/items") return await registerItem(services, request);
-      if (request.method === "POST" && pathname === "/api/pluggy/sync") return await syncAll(services, request);
+      if (request.method === "POST" && pathname === "/api/pluggy/items") return await registerItem(services, request, context);
+      if (request.method === "POST" && pathname === "/api/pluggy/sync") return await syncAll(services, request, context);
+      if (request.method === "POST" && pathname === "/api/categorize") return await categorize(services, request);
       if (request.method === "DELETE" && itemRoute) return await removeItem(services, request, decodeURIComponent(itemRoute[1]));
       return json({ error: "not found" }, 404);
     } catch (error) {

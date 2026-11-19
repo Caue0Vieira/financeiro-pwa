@@ -19,6 +19,8 @@ export default defineConfig({
       PLUGGY_CLIENT_ID: bindings.secret(),
       PLUGGY_CLIENT_SECRET: bindings.secret(),
       PLUGGY_WEBHOOK_SECRET: bindings.secret(),
+      // Workers AI: categorises what no learned rule covers (src/worker/categorize.ts).
+      AI: bindings.ai(),
     },
   },
 });

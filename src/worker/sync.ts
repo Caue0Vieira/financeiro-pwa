@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bankNameFor, dayOf, mapTransaction, purchasesAreNegative, type PluggyAccount } from "./mapping";
+import { inferCategory } from "../frontend/merchants";
+import { descriptionKey, loadRules } from "./categorize";
 import type { Pluggy, PluggyItem } from "./pluggy";
 
 type Link = { pluggy_account_id: string; account_id: string | null; card_id: string | null };
@@ -52,20 +54,23 @@ async function linkAccounts(db: SupabaseClient, userId: string, item: PluggyItem
 /**
  * Imports the item's posted transactions since `dateFrom` (default: a margin before the last
  * sync, or 90 days on the first one). Rows already imported are skipped by external id.
+ * Categories come from the user's learned rules first, then the built-in merchant patterns.
  */
 export async function syncItem(
   db: SupabaseClient,
   pluggy: Pluggy,
   userId: string,
   itemId: string,
-  categorize: (description: string) => string,
   options: { dateFrom?: string } = {},
 ) {
-  const [item, accounts, stored] = await Promise.all([
+  const [item, accounts, stored, rules] = await Promise.all([
     pluggy.item(itemId),
     pluggy.accounts(itemId),
     db.from("pluggy_items").select("last_synced_at").eq("item_id", itemId).eq("user_id", userId).single(),
+    loadRules(db, userId),
   ]);
+  const learned = (description: string) => rules.get(descriptionKey(description));
+  const categorize = (description: string) => learned(description) ?? inferCategory(description);
   fail(stored.error);
   const lastSync = stored.data?.last_synced_at as string | null;
   const dateFrom = options.dateFrom ?? (lastSync ? daysAgo(Math.ceil((Date.now() - Date.parse(lastSync)) / 86_400_000) + 10) : daysAgo(90));
@@ -100,7 +105,12 @@ export async function syncItem(
       for (const { external_id } of data ?? []) known.add(external_id);
     }
     const fresh = rows.filter((row) => !known.has(row.external_id))
-      .map((row) => ({ ...row, user_id: userId, [target.column]: target.id }));
+      .map((row) => ({
+        ...row,
+        user_id: userId,
+        [target.column]: target.id,
+        category_source: learned(row.description) === row.category ? "rule" : null,
+      }));
     for (let i = 0; i < fresh.length; i += 200) {
       const { error } = await db.from("transactions").insert(fresh.slice(i, i + 200));
       fail(error);

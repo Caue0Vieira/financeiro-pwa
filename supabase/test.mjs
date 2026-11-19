@@ -1,6 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { descriptionKey } from '../src/worker/categorize.ts';
 
 const db = new PGlite();
 await db.exec(`
@@ -160,11 +161,34 @@ assert.equal(archivedDashboard.cards.find(item => item.id === card)?.archived, t
 assert.equal(archivedDashboard.cards.find(item => item.id === dueCard)?.archived, false);
 assert.ok(archivedDashboard.invoice_rows.some(item => item.card_id === card));
 assert.ok(archivedDashboard.invoices.some(item => item.card_id === card));
+// Category rules: a correction is learned and fixes the other automatic rows with that description.
+for (const sample of ['  PADARIA SÃO JOÃO 0231*12/03 ', 'Açaí do Zé', 'UBER *TRIP 2311']) {
+  const sqlKey = (await db.query('select public.description_key($1) as k', [sample])).rows[0].k;
+  assert.equal(sqlKey, descriptionKey(sample));
+}
+const learnRow = async (description, category) => (await db.query(
+  "insert into public.transactions(account_id,occurred_on,description,amount_cents,kind,category) values ($1,'2026-03-02',$2,-1500,'expense',$3) returning id",
+  [account, description, category],
+)).rows[0].id;
+const uberA = await learnRow('UBER *TRIP 2311', 'Sem categoria');
+const uberB = await learnRow('UBER *TRIP 9876', 'Sem categoria');
+const uberMine = await learnRow('Uber trip', 'Lazer');
+const pix = await learnRow('PIX ENVIADO', 'Sem categoria');
+await db.query("update public.transactions set category='Transporte' where id=$1", [uberA]);
+const categoryOf = async (id) => (await db.query('select category, category_source from public.transactions where id=$1', [id])).rows[0];
+assert.deepEqual(await categoryOf(uberA), { category: 'Transporte', category_source: null });
+assert.deepEqual(await categoryOf(uberB), { category: 'Transporte', category_source: 'rule' });
+assert.deepEqual(await categoryOf(uberMine), { category: 'Lazer', category_source: null });
+await db.query("update public.transactions set category='Presentes' where id=$1", [pix]);
+assert.deepEqual((await db.query('select description_key, category from public.category_rules')).rows, [{ description_key: 'uber trip', category: 'Transporte' }]);
+await db.query("update public.transactions set category='Mobilidade' where id=$1", [uberB]);
+assert.equal((await db.query("select category from public.category_rules where description_key='uber trip'")).rows[0].category, 'Mobilidade');
 await db.exec('reset role');
 const other='00000000-0000-0000-0000-000000000002';
 await db.query('insert into auth.users(id) values ($1)',[other]);
 await db.exec(`select set_config('request.jwt.claim.sub','${other}',false); set role authenticated;`);
 assert.equal((await db.query('select * from public.transactions')).rows.length,0);
+assert.equal((await db.query('select * from public.category_rules')).rows.length,0);
 const otherPlanning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;
 assert.deepEqual(otherPlanning,{budget:0,targets:[],valuations:[]});
 assert.deepEqual((await db.query("select public.nitido_expense_days('2026-01-01','2026-02-01') as value")).rows[0].value,[]);

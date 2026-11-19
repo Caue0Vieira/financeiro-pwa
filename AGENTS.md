@@ -8,6 +8,7 @@ Aplicativo pessoal para acompanhar receitas, despesas, faturas, investimentos e 
 - A hospedagem é Cloudflare Workers. O Worker se chama `financeiro-pwa` e sua configuração fica em [`cloudflare.config.ts`](cloudflare.config.ts).
 - Quando o usuário pedir o link do app rodando, use a URL de produção acima. Se o endereço mudar, confira **Domains & Routes** no painel do Worker e atualize este arquivo.
 - O [`README.md`](README.md) descreve o fluxo de publicação. Para conferir o site que já está no ar, acesse a URL de produção.
+- O deploy é feito só pelo GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)), a cada push na `master`. Não rode `cf deploy` na máquina local. Para acompanhar, use `gh run list --workflow deploy.yml`; para publicar de novo sem mudar código, use `gh workflow run deploy.yml`.
 
 ## Desenvolvimento
 

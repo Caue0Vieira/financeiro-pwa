@@ -105,6 +105,14 @@ await db.query("insert into public.goal_contributions(goal_id,amount_cents,contr
 const asset = (await db.query("insert into public.investments(name,value_cents,as_of) values ('Tesouro',200000,'2026-01-10') returning id")).rows[0].id;
 await db.query("update public.investments set value_cents=210000,as_of='2026-01-20' where id=$1",[asset]);
 await db.query("update public.investments set value_cents=212000 where id=$1",[asset]);
+// Quoted assets: ticker and quantity go together; a quote updates the value and the day's valuation.
+await assert.rejects(() => db.query("insert into public.investments(name,value_cents,as_of,ticker) values ('Sem quantidade',0,'2026-01-10','PETR4')"));
+await assert.rejects(() => db.query("insert into public.investments(name,value_cents,as_of,ticker,quantity) values ('Ticker inválido',0,'2026-01-10','petr4',10)"));
+await assert.rejects(() => db.query("insert into public.investments(name,value_cents,as_of,ticker,quantity) values ('Quantidade zero',0,'2026-01-10','PETR4',0)"));
+const stock = (await db.query("insert into public.investments(name,value_cents,as_of,ticker,quantity) values ('Petrobras',0,'2026-01-20','PETR4',10.5) returning id")).rows[0].id;
+await db.query("update public.investments set price_cents=3820,value_cents=40110,as_of='2026-01-20',quoted_at=now() where id=$1", [stock]);
+assert.equal(Number((await db.query("select value_cents from public.investment_valuations where investment_id=$1 and snapshot_on='2026-01-20'", [stock])).rows[0].value_cents), 40110);
+await db.query("delete from public.investments where id=$1", [stock]);
 const planning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;
 assert.equal(planning.budget,320000);
 assert.deepEqual(planning.targets,[{id:goal,name:'Viagem',amount:90000,saved:25000}]);

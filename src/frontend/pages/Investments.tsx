@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { Dashboard, Valuation } from "../../contracts";
+import type { Dashboard, Investment, Valuation } from "../../contracts";
 import { shiftMonth, todayInSaoPaulo } from "../../date";
 import { Icon, PageHeading } from "../components/common";
 import { dateLabel, money } from "../format";
@@ -62,8 +62,43 @@ function PortfolioChart({ series }: { series: Valuation[] }) {
   );
 }
 
-export default function Investments({ data, setModal }: { data: Dashboard; setModal: OpenEditor }) {
+const quotedTime = (iso: string) => {
+  const zone = { timeZone: "America/Sao_Paulo" } as const;
+  const day = new Date(iso).toLocaleDateString("en-CA", zone);
+  const time = new Date(iso).toLocaleTimeString("pt-BR", { ...zone, hour: "2-digit", minute: "2-digit" });
+  return day === todayInSaoPaulo() ? `às ${time}` : `em ${dateLabel(day)}`;
+};
+
+/** A ticker saved but not quoted yet: its value is 0 until the first quote. */
+const awaitingQuote = (item: Investment) => Boolean(item.ticker) && !item.price;
+
+function holdingDetail(item: Investment) {
+  if (!item.ticker || !item.quantity) return item.institution || "Instituição não informada";
+  const units = `${item.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 8 })} ${item.quantity === 1 ? "cota" : "cotas"}`;
+  if (!item.price) return `${item.ticker} · ${units} · aguardando cotação`;
+  return `${item.ticker} · ${units} × ${money(item.price)}${item.quotedAt ? ` · ${quotedTime(item.quotedAt)}` : ""}`;
+}
+
+export default function Investments({
+  data,
+  setModal,
+  refreshQuotes,
+}: {
+  data: Dashboard;
+  setModal: OpenEditor;
+  refreshQuotes: () => Promise<void>;
+}) {
   const [range, setRange] = useState<(typeof ranges)[number][0]>(1);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasTickers = data.investments.some(({ ticker }) => ticker);
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshQuotes();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const contributed = data.investments.reduce((sum, item) => sum + item.contributed, 0);
   const today = todayInSaoPaulo();
   const from = range ? shiftMonth(today.slice(0, 7), 1 - range) + "-01" : "";
@@ -119,6 +154,11 @@ export default function Investments({ data, setModal }: { data: Dashboard; setMo
       <section className="panel screen-list portfolio-list">
         <header className="panel-head">
           <h2>Sua carteira</h2>
+          {hasTickers && (
+            <button className="text-button" onClick={() => void refresh()} disabled={refreshing} aria-busy={refreshing}>
+              {refreshing ? "Atualizando…" : "Atualizar cotações"}
+            </button>
+          )}
         </header>
         {data.investments.length === 0 ? (
           <p className="empty">Adicione seu primeiro investimento para acompanhar seu patrimônio.</p>
@@ -135,11 +175,11 @@ export default function Investments({ data, setModal }: { data: Dashboard; setMo
               </span>
               <span className="transaction-info">
                 <strong>{item.name}</strong>
-                <span>{item.institution || "Instituição não informada"}</span>
+                <span>{holdingDetail(item)}</span>
               </span>
               <span className="portfolio-value">
                 <strong className="transaction-amount">{money(item.value)}</strong>
-                {item.contributed > 0 && (
+                {item.contributed > 0 && !awaitingQuote(item) && (
                   <small className={item.value >= item.contributed ? "income" : "expense-change"}>
                     {((item.value - item.contributed) / item.contributed).toLocaleString("pt-BR", {
                       style: "percent",

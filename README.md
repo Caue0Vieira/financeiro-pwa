@@ -65,6 +65,19 @@ npx cf workers secrets update PLUGGY_WEBHOOK_SECRET --worker financeiro-pwa
 $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); (($b | ForEach-Object { $_.ToString('x2') }) -join '') | Set-Clipboard
 ```
 
+### Cotações da B3 (brapi)
+
+Investimentos com **ticker** e **quantidade** (ações, FIIs, ETFs e BDRs, como PETR4 ou BOVA11) têm o saldo calculado pela cotação: quantidade × último preço. O Worker atualiza esse saldo de hora em hora durante o pregão, nos dias úteis das 10h às 18h, e mais uma vez às 18h30, depois do fechamento. A tela **Investimentos** também tem o botão **Atualizar cotações**, que ignora ativos cotados nos últimos 5 minutos. As cotações gratuitas têm atraso de cerca de 15 minutos.
+
+1. Aplique a migração [20261119000000_investment_quotes.sql](supabase/migrations/20261119000000_investment_quotes.sql) no SQL Editor do Supabase.
+2. Crie uma conta gratuita em [brapi.dev](https://brapi.dev) e cadastre o token como segredo do Worker:
+
+```sh
+npx cf workers secrets update BRAPI_TOKEN --worker financeiro-pwa
+```
+
+O token é opcional. Sem ele, ou quando a brapi falha ou chega ao limite do plano, o Worker usa o endpoint público e não oficial do Yahoo Finance, que pode mudar sem aviso. O Worker busca cada ticker uma vez por rodada, mesmo que ele esteja em várias carteiras; com 20 tickers, são cerca de 4,4 mil requisições por mês.
+
 No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adicionar à Tela de Início** e ative **Abrir como App da Web** quando essa opção aparecer.
 
 ## Arquivos de importação

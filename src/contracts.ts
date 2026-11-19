@@ -39,7 +39,14 @@ export interface Investment {
   contributed: number;
   value: number;
   updatedOn: string;
+  /** B3 ticker (e.g. 'PETR4'); with `quantity`, the value follows the quote. */
+  ticker?: string;
+  quantity?: number;
+  /** Last quote, in cents per unit, and when it was fetched. */
+  price?: number;
+  quotedAt?: string;
 }
+export interface QuoteRefresh { updated: number; failed: string[] }
 export interface Recurrence {
   id: string;
   description: string;
@@ -157,6 +164,8 @@ export interface FinanceService {
   confirmImport(payload: ImportPayload): Promise<ImportResult>;
   saveProfile(name: string, avatar?: File | null): Promise<void>;
   changePassword(current: string, next: string): Promise<void>;
+  /** Prices the investments that have a ticker with the latest B3 quote. */
+  refreshQuotes(): Promise<QuoteRefresh>;
   /** Open Finance through Pluggy; only with a real account (absent in the demo). */
   bankConnections?: BankConnections;
 }

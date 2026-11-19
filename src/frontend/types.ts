@@ -29,5 +29,5 @@ export type OpenEditor = (modal: EditModal) => void;
 
 export type FinanceCommands = Pick<
   FinanceService,
-  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections"
+  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "refreshQuotes"
 > & { refresh: () => Promise<void> };

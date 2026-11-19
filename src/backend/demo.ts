@@ -12,6 +12,10 @@ export function createDemoService(): FinanceService {
   const invoiceDateOverrides = new Map<string, { closingDate: string | null; dueDate: string | null }>();
   const investments: Investment[] = [
     { id: 'acoes', institution: 'Corretora Pontal', name: 'Ações', contributed: 218025, value: 245060, updatedOn: todayInSaoPaulo() },
+    {
+      id: 'etf', institution: 'Corretora Pontal', name: 'ETF do Ibovespa', contributed: 110000, value: 120600,
+      updatedOn: todayInSaoPaulo(), ticker: 'BOVA11', quantity: 9, price: 13400, quotedAt: new Date().toISOString(),
+    },
     { id: 'fundo', institution: 'Corretora Pontal', name: 'Fundos de investimento', contributed: 113197, value: 123045, updatedOn: todayInSaoPaulo() },
     { id: 'cripto', institution: 'Corretora Pontal', name: 'Criptomoedas', contributed: 55481, value: 63970, updatedOn: todayInSaoPaulo() },
   ];
@@ -34,6 +38,18 @@ export function createDemoService(): FinanceService {
       value: Math.round(item.value * (0.78 + index * 0.22 / 72 + Math.sin(index * Math.PI / 4) * 0.017)),
     })),
   ]));
+
+  function record(item: Investment) {
+    const points = (values.get(item.id) ?? []).filter(({ date }) => date !== item.updatedOn);
+    values.set(item.id, [...points, { date: item.updatedOn, value: item.value }]);
+  }
+
+  /** Demo quote: a small random move around the last price (or R$ 25,00 for a new ticker). */
+  function quote(item: Investment) {
+    const price = Math.max(1, Math.round((item.price ?? 2500) * (1 + (Math.random() - 0.5) * 0.02)));
+    Object.assign(item, { price, value: Math.round(item.quantity! * price), updatedOn: todayInSaoPaulo(), quotedAt: new Date().toISOString() });
+    record(item);
+  }
 
   function portfolioHistory() {
     const series = [...values.values()].map((points) => [...points].sort((a, b) => a.date.localeCompare(b.date)));
@@ -213,10 +229,14 @@ export function createDemoService(): FinanceService {
           return;
         }
         case 'saveInvestment': {
-          const investment = { ...action.investment, id: action.investment.id ?? crypto.randomUUID() };
+          const id = action.investment.id ?? crypto.randomUUID();
+          const previous = investments.find((item) => item.id === id);
+          const investment: Investment = { ...action.investment, id };
+          if (investment.ticker && investment.ticker === previous?.ticker) investment.price = previous.price;
           put(investments, investment);
-          const points = (values.get(investment.id) ?? []).filter(({ date }) => date !== investment.updatedOn);
-          values.set(investment.id, [...points, { date: investment.updatedOn, value: investment.value }]);
+          // Like the real backend, a saved ticker is quoted right away.
+          if (investment.ticker && investment.quantity) quote(investment);
+          else record(investment);
           return;
         }
         case 'deleteInvestment':
@@ -340,6 +360,11 @@ export function createDemoService(): FinanceService {
       if (avatar === undefined) return;
       if (profile.avatarUrl) URL.revokeObjectURL(profile.avatarUrl);
       profile.avatarUrl = avatar ? URL.createObjectURL(avatar) : undefined;
+    },
+    async refreshQuotes() {
+      const quoted = investments.filter((item) => item.ticker && item.quantity);
+      quoted.forEach(quote);
+      return { updated: quoted.length, failed: [] };
     },
     async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
   };

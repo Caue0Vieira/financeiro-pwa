@@ -54,6 +54,8 @@ export default function Editor({
   const today = todayInSaoPaulo();
   const entryDate = (type === "entry" && item?.date) || (today.startsWith(month) ? today : `${month}-01`);
   const investmentBalanceHint = useId();
+  const [ticker, setTicker] = useState(type === "investment" ? (item?.ticker ?? "") : "");
+  const quoted = ticker.trim() !== "";
   const [kind, setKind] = useState<EntryKind>(
     type === "entry" ? (modal.item?.kind ?? modal.kind ?? "expense") : "expense",
   );
@@ -175,7 +177,14 @@ export default function Editor({
       });
     else if (type === "contribution")
       void mutate({ type: "contributeTarget", id: item.id, amount: cents(f, "amount") });
-    else if (type === "investment")
+    else if (type === "investment") {
+      const code = quoted ? ticker.trim().toUpperCase().replace(/\.SA$/, "") : undefined;
+      const quantity = code ? Number(read(f, "quantity").replace(/\./g, "").replace(",", ".")) : undefined;
+      // A quoted asset is worth quantity × last price (0 until the first quote, which the save asks for).
+      const lastPrice = code && code === item?.ticker ? item?.price : undefined;
+      let value = 0;
+      if (!code) value = cents(f, "value");
+      else if (lastPrice && quantity) value = Math.round(quantity * lastPrice);
       void mutate({
         type: "saveInvestment",
         investment: {
@@ -183,10 +192,13 @@ export default function Editor({
           name: read(f, "name"),
           institution: read(f, "institution"),
           contributed: cents(f, "contributed"),
-          value: cents(f, "value"),
+          value,
           updatedOn: read(f, "updatedOn") || item?.updatedOn || today,
+          ticker: code,
+          quantity,
         },
       });
+    }
     else if (type === "card")
       void mutate({
         type: "saveCard",
@@ -451,6 +463,34 @@ export default function Editor({
                 placeholder="Ex.: Banco Inter"
                 full
               />
+              <details className="form-details full" open={Boolean(item?.ticker)}>
+                <summary>Ação, FII ou ETF da B3</summary>
+                <Field
+                  label="Ticker"
+                  name="ticker"
+                  value={ticker}
+                  onChange={(event) => setTicker(event.target.value.toUpperCase())}
+                  placeholder="Ex.: PETR4"
+                  pattern="\s*[A-Za-z]{4}[0-9]{1,2}(\.SA)?\s*"
+                  title="Quatro letras e um ou dois números, como PETR4 ou BOVA11"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={9}
+                />
+                {quoted && (
+                  <Field
+                    label="Quantidade"
+                    name="quantity"
+                    defaultValue={item?.quantity?.toLocaleString("pt-BR", { maximumFractionDigits: 8 }).replace(/\./g, "")}
+                    placeholder="Ex.: 100"
+                    inputMode="decimal"
+                    pattern="\d+(,\d{1,8})?"
+                    title="Use números e vírgula para frações, como 10,5"
+                    required
+                  />
+                )}
+              </details>
               <MoneyField
                 label="Valor aplicado (R$)"
                 name="contributed"
@@ -458,27 +498,35 @@ export default function Editor({
                 defaultValue={amount(item?.contributed)}
                 required
               />
-              <MoneyField
-                label="Saldo atual (R$)"
-                name="value"
-                min={0}
-                defaultValue={amount(item?.value)}
-                aria-describedby={investmentBalanceHint}
-                required
-              />
-              <p className="form-hint full" id={investmentBalanceHint}>
-                Use o saldo que aparece na sua instituição na data da atualização, com os ganhos ou perdas.
-              </p>
-              <details className="form-details full">
-                <summary>Data da atualização</summary>
-                <Field
-                  label="Data"
-                  name="updatedOn"
-                  type="date"
-                  defaultValue={item?.updatedOn || today}
-                  full
-                />
-              </details>
+              {quoted ? (
+                <p className="form-hint full">
+                  O saldo é calculado pela quantidade e pela cotação da B3, com atraso de cerca de 15 minutos.
+                </p>
+              ) : (
+                <>
+                  <MoneyField
+                    label="Saldo atual (R$)"
+                    name="value"
+                    min={0}
+                    defaultValue={amount(item?.value)}
+                    aria-describedby={investmentBalanceHint}
+                    required
+                  />
+                  <p className="form-hint full" id={investmentBalanceHint}>
+                    Use o saldo que aparece na sua instituição na data da atualização, com os ganhos ou perdas.
+                  </p>
+                  <details className="form-details full">
+                    <summary>Data da atualização</summary>
+                    <Field
+                      label="Data"
+                      name="updatedOn"
+                      type="date"
+                      defaultValue={item?.updatedOn || today}
+                      full
+                    />
+                  </details>
+                </>
+              )}
             </>
           )}
           {type === "card" && (

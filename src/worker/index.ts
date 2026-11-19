@@ -4,11 +4,12 @@ import manifestSource from "../../public/manifest.webmanifest?raw";
 import { manifestFor } from "./manifest";
 import { mapTransaction, purchasesAreNegative } from "./mapping";
 import { PluggyError, pluggyClient, tokenHeader, validSignature, validToken, type Pluggy } from "./pluggy";
+import { quoteSourceFor, refreshQuotes } from "./quotes";
 import { deleteTransactions, syncItem } from "./sync";
 
 /**
- * Server side of the Pluggy (Open Finance) integration. Runs only for /api/* (see
- * cloudflare.config.ts); everything else is served as static assets. Secrets never reach the
+ * Server side of the Pluggy (Open Finance) integration and of the B3 quotes. Runs only for /api/*
+ * (see cloudflare.config.ts); everything else is served as static assets. Secrets never reach the
  * browser: the app calls these routes with the user's Supabase session token.
  */
 export type Env = {
@@ -17,8 +18,11 @@ export type Env = {
   PLUGGY_CLIENT_ID: string;
   PLUGGY_CLIENT_SECRET: string;
   PLUGGY_WEBHOOK_SECRET: string;
+  /** Optional: without it, quotes come from Yahoo Finance only. */
+  BRAPI_TOKEN?: string;
 };
 type Context = { waitUntil(promise: Promise<unknown>): void };
+type Controller = { cron: string };
 type Services = { env: Env; db: SupabaseClient; pluggy: Pluggy };
 
 const json = (body: unknown, status = 200) =>
@@ -202,6 +206,15 @@ async function syncEveryItem(services: Services) {
   }
 }
 
+/** "Atualizar cotações": prices this user's tickers now (skipping ones quoted in the last 5 minutes). */
+async function refreshUserQuotes(services: Services, request: Request) {
+  const userId = await signedInUser(services, request);
+  return json(await refreshQuotes(services.db, quoteSourceFor(services.env.BRAPI_TOKEN), { userId, minAgeMs: 5 * 60_000 }));
+}
+
+/** Cron of the Pluggy backup sync; every other schedule in cloudflare.config.ts refreshes quotes. */
+const PLUGGY_SYNC_CRON = "0 */6 * * *";
+
 function servicesFor(env: Env): Services {
   return {
     env,
@@ -212,13 +225,21 @@ function servicesFor(env: Env): Services {
   };
 }
 
-const configured = (env: Env) =>
-  Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
+const supabaseReady = (env: Env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+const pluggyReady = (env: Env) => supabaseReady(env) && Boolean(env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
 
 export default {
-  async scheduled(_controller: unknown, env: Env, context: Context) {
-    if (!configured(env)) return;
-    context.waitUntil(syncEveryItem(servicesFor(env)));
+  async scheduled(controller: Controller, env: Env, context: Context) {
+    if (controller.cron === PLUGGY_SYNC_CRON) {
+      if (pluggyReady(env)) context.waitUntil(syncEveryItem(servicesFor(env)));
+      return;
+    }
+    if (!supabaseReady(env)) return;
+    context.waitUntil(
+      refreshQuotes(servicesFor(env).db, quoteSourceFor(env.BRAPI_TOKEN))
+        .then((result) => console.log("scheduled quotes", result))
+        .catch((error) => console.error("scheduled quotes", error)),
+    );
   },
 
   async fetch(request: Request, env: Env, context: Context): Promise<Response> {
@@ -233,11 +254,13 @@ export default {
         },
       });
     }
-    if (!configured(env)) {
-      return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
-    }
+    if (!supabaseReady(env)) return json({ error: "Servidor ainda não configurado." }, 503);
     try {
       const services = servicesFor(env);
+      if (request.method === "POST" && pathname === "/api/quotes/refresh") return await refreshUserQuotes(services, request);
+      if (pathname.startsWith("/api/pluggy/") && !pluggyReady(env)) {
+        return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
+      }
       const itemRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)$/);
       if (request.method === "POST" && pathname === "/api/pluggy/webhook") return await webhook(services, request, context);
       if (request.method === "POST" && pathname === "/api/pluggy/connect-token") return await connectToken(services, request);

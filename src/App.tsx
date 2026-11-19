@@ -133,6 +133,7 @@ export default function App() {
     dashboard: service.dashboard,
     analysis: service.analysis,
     bankConnections: service.bankConnections,
+    refreshQuotes: service.refreshQuotes,
     refresh,
   };
   return (

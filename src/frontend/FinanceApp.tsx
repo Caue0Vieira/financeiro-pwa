@@ -137,6 +137,17 @@ export default function FinanceApp({
     }
   }
 
+  async function refreshQuotes() {
+    try {
+      const { updated, failed } = await commands.refreshQuotes();
+      await commands.refresh();
+      if (failed.length) showNotice(`Sem cotação para ${failed.join(", ")}. Confira o ticker.`, "error");
+      else showNotice(updated ? "Cotações atualizadas." : "As cotações já estão em dia.");
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Não foi possível atualizar as cotações.", "error");
+    }
+  }
+
   const add = () => openEditor({ type: "entry" });
   const activeCards = data.cards.filter((card) => !card.archived);
   const monthControl = <MonthControl month={month} onMonth={onMonth} />;
@@ -193,7 +204,7 @@ export default function FinanceApp({
       />
     ),
     commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
-    investments: <Investments data={data} setModal={openEditor} />,
+    investments: <Investments data={data} setModal={openEditor} refreshQuotes={refreshQuotes} />,
     goals: <Goals data={data} openEditor={openEditor} />,
     import: (
       <>

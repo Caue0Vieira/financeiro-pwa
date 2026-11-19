@@ -10,8 +10,14 @@ export default defineConfig({
     workersDev: true,
     previewUrls: false,
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*', '/manifest.webmanifest'] },
-    // Backup for the Pluggy webhook: imports what Pluggy already has for every connection.
-    triggers: [triggers.scheduled({ schedule: '0 */6 * * *' })],
+    // '0 */6 * * *' backs up the Pluggy webhook (imports what Pluggy already has for every
+    // connection; src/worker/index.ts matches this exact string). The others price the B3 tickers:
+    // hourly during the session (10h–18h in São Paulo = 13h–21h UTC) and once after the close.
+    triggers: [
+      triggers.scheduled({ schedule: '0 */6 * * *' }),
+      triggers.scheduled({ schedule: '0 13-21 * * 1-5' }),
+      triggers.scheduled({ schedule: '30 21 * * 1-5' }),
+    ],
     // Values are set in Cloudflare, never committed: see README → "Open Finance (Pluggy)".
     env: {
       SUPABASE_URL: bindings.secret(),
@@ -19,6 +25,8 @@ export default defineConfig({
       PLUGGY_CLIENT_ID: bindings.secret(),
       PLUGGY_CLIENT_SECRET: bindings.secret(),
       PLUGGY_WEBHOOK_SECRET: bindings.secret(),
+      // BRAPI_TOKEN is optional (quotes fall back to Yahoo Finance) and so is not declared here:
+      // declared secrets are required. Set it with `cf workers secrets update`; see the README.
     },
   },
 });

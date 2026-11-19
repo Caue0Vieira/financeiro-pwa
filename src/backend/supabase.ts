@@ -8,6 +8,7 @@ import type {
   Entry,
   Dashboard,
   Action,
+  QuoteRefresh,
   Session,
   SavingsTarget,
   Valuation,
@@ -81,11 +82,11 @@ export function createSupabaseService(
     fail(error);
     return data.session?.user.email ? { email: data.session.user.email } : null;
   };
-  /** Calls the Worker's /api with the session token; the Pluggy secrets stay on the server. */
+  /** Calls the Worker's /api with the session token; the Pluggy and brapi secrets stay on the server. */
   const api = async <T>(path: string, method = "POST", body?: unknown): Promise<T> => {
     const { data } = await db.auth.getSession();
     if (!data.session) throw new Error("Sessão encerrada");
-    const response = await fetch(`/api/pluggy/${path}`, {
+    const response = await fetch(`/api/${path}`, {
       method,
       headers: { authorization: `Bearer ${data.session.access_token}`, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -103,14 +104,16 @@ export function createSupabaseService(
         itemId: x.item_id, bank: x.connector_name, status: x.status, lastSyncedAt: x.last_synced_at,
       }));
     },
-    connectToken: (itemId) => api<{ connectToken: string }>("connect-token", "POST", { itemId }).then((r) => r.connectToken),
-    register: (itemId) => api("items", "POST", { itemId }),
-    sync: () => api("sync"),
-    remove: (itemId) => api<void>(`items/${encodeURIComponent(itemId)}`, "DELETE"),
+    connectToken: (itemId) => api<{ connectToken: string }>("pluggy/connect-token", "POST", { itemId }).then((r) => r.connectToken),
+    register: (itemId) => api("pluggy/items", "POST", { itemId }),
+    sync: () => api("pluggy/sync"),
+    remove: (itemId) => api<void>(`pluggy/items/${encodeURIComponent(itemId)}`, "DELETE"),
   };
+  const refreshQuotes = () => api<QuoteRefresh>("quotes/refresh");
   return {
     session,
     bankConnections,
+    refreshQuotes,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),
@@ -274,7 +277,14 @@ export function createSupabaseService(
             contributed_cents: x.contributed,
             value_cents: x.value,
             as_of: x.updatedOn,
+            ticker: x.ticker ?? null,
+            quantity: x.ticker ? x.quantity : null,
+            // A saved ticker is quoted again right away (the Worker skips recent quotes otherwise).
+            quoted_at: null,
+            ...(x.ticker ? {} : { price_cents: null }),
           });
+          // Best effort: when the quote fails, the value typed in the form stays.
+          if (x.ticker) await refreshQuotes().catch(() => undefined);
           break;
         }
         case "deleteInvestment":
@@ -571,6 +581,10 @@ export function createSupabaseService(
           contributed: Number(x.contributed_cents),
           value: Number(x.value_cents),
           updatedOn: x.as_of,
+          ticker: x.ticker ?? undefined,
+          quantity: x.quantity == null ? undefined : Number(x.quantity),
+          price: x.price_cents == null ? undefined : Number(x.price_cents),
+          quotedAt: x.quoted_at ?? undefined,
         })),
         recurrences: rules.map((r: any) => ({
           id: r.id,

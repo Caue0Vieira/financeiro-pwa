@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Dashboard, Entry, FinanceService } from "../../contracts";
 import { EntryRow, HeaderMenu, Icon, PageHeading } from "../components/common";
+import { ListSkeleton } from "../components/Skeleton";
 import { todayInSaoPaulo } from "../../date";
 import type { OpenEditor } from "../types";
 
@@ -193,10 +194,11 @@ export default function Activity({
             </p>
           )
         ) : null}
-        {loadingMonth && (
-          <p className="empty" role="status">
-            Carregando transações…
-          </p>
+        {loadingMonth && rows.length === 0 && (
+          <>
+            <ListSkeleton rows={7} />
+            <span className="skeleton-status" role="status">Carregando transações…</span>
+          </>
         )}
         {error && rows.length === 0 && !loadingMonth && (
           <button className="text-button load-more" onClick={() => setRetry(retry + 1)}>

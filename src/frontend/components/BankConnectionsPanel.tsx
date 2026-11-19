@@ -3,6 +3,7 @@ import type { BankConnection, BankConnections } from "../../contracts";
 import { useTheme } from "../theme/ThemeProvider";
 import { BankIcon } from "./BankIcon";
 import { Icon } from "./common";
+import { PanelSkeleton } from "./Skeleton";
 
 const relative = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 function syncedLabel(iso: string | null) {
@@ -34,7 +35,7 @@ export function BankConnectionsPanel({
   onOpenHelp: () => void;
 }) {
   const { resolvedTheme } = useTheme();
-  const [items, setItems] = useState<BankConnection[]>([]);
+  const [items, setItems] = useState<BankConnection[]>();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [itemId, setItemId] = useState("");
@@ -95,11 +96,14 @@ export function BankConnectionsPanel({
     );
   }
 
+  if (!items && !loadFailed) return <PanelSkeleton rows={3} label="Carregando conexões…" />;
+  const list = items ?? [];
+
   return (
     <section className="panel screen-list bank-connections" aria-busy={busy !== null}>
       <header className="panel-head">
         <h2>Conexões</h2>
-        {items.length > 0 && (
+        {list.length > 0 && (
           <button
             className="text-button"
             disabled={busy !== null}
@@ -110,13 +114,13 @@ export function BankConnectionsPanel({
         )}
       </header>
       {loadFailed && <p role="alert" className="subtle">Não foi possível carregar as conexões bancárias.</p>}
-      {items.length === 0 && !loadFailed && (
+      {list.length === 0 && !loadFailed && (
         <p className="subtle">
           Conecte o seu banco pelo Meu Pluggy (grátis para uso pessoal) e as compras novas entram sozinhas, já na
           fatura certa do cartão.
         </p>
       )}
-      {items.map((item) => (
+      {list.map((item) => (
         <div className="bank-connection" key={item.itemId}>
           <div className="transaction">
             <BankIcon bank={item.bank} />

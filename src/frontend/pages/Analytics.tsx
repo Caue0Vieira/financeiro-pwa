@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AnalysisPeriod, Dashboard, FinanceService, SpendingAnalysis } from "../../contracts";
 import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from "../../date";
 import { Icon, categoryAppearance } from "../components/common";
+import { AnalyticsSkeleton } from "../components/Skeleton";
 import { dateLabel, money, monthName } from "../format";
 
 const periods = [
@@ -88,11 +89,7 @@ export default function Analytics({
           </button>
         </div>
       )}
-      {!analysis && !error && (
-        <p className="empty" role="status">
-          Carregando os gastos do período…
-        </p>
-      )}
+      {!analysis && !error && <AnalyticsSkeleton />}
       {analysis && (
         <div className="analytics-layout">
           <section className="panel analysis-chart">

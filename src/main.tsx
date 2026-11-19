@@ -9,6 +9,7 @@ import './frontend/styles/base.css';
 import './frontend/styles/components/fields.css';
 import './frontend/styles/components/dialog.css';
 import './frontend/styles/components/notifications.css';
+import './frontend/styles/components/skeleton.css';
 import { ThemeProvider } from './frontend/theme/ThemeProvider';
 import { applyAppIcon, readAppIcon } from './frontend/theme/appIcon';
 import App from './App';

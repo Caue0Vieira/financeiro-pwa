@@ -4,6 +4,7 @@ import { currentMonth } from './date';
 import { configuredBackend, createDemoService } from './backend';
 import FinanceApp from './frontend/FinanceApp';
 import { Brand } from './frontend/components/common';
+import { AppSkeleton, PageSkeleton, SessionLock } from './frontend/components/Skeleton';
 import Login from './frontend/pages/Login';
 import Welcome from './frontend/pages/Welcome';
 import type { FinanceCommands } from './frontend/types';
@@ -90,7 +91,7 @@ export default function App() {
     setMonth(currentMonth());
   }
 
-  if (!ready) return <Status>Verificando sua sessão…</Status>;
+  if (!ready) return <SessionLock />;
   if (!online && !demo) {
     return <Status title="Sem conexão">Conecte-se à internet para abrir seu painel financeiro.</Status>;
   }
@@ -115,10 +116,11 @@ export default function App() {
     />;
   }
   if (!data) {
+    if (!error) return <AppSkeleton />;
     return (
       <Status>
-        {error || 'Carregando seu painel…'}
-        {error && <button className="button" onClick={() => void refresh().catch(() => {})}>Tentar novamente</button>}
+        {error}
+        <button className="button" onClick={() => void refresh().catch(() => {})}>Tentar novamente</button>
       </Status>
     );
   }
@@ -147,7 +149,7 @@ export default function App() {
           catch { setError('Não foi possível encerrar a sessão. Tente novamente.'); }
         }}
         importView={(
-          <Suspense fallback={<p role="status">Abrindo importação…</p>}>
+          <Suspense fallback={<PageSkeleton label="Abrindo importação…" rows={4} />}>
             <ImportView data={data} month={data.month} loadHistoryPage={commands.history} confirmImport={commands.confirmImport} refresh={refresh} />
           </Suspense>
         )}

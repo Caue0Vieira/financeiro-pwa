@@ -482,6 +482,10 @@
 .home-card-art[data-art] .home-card-details b { display: none; }
 
 :root[data-theme] .home-quick-actions button { color: var(--text); font-weight: 650; }
+/* Icon-wide columns spread edge to edge: the first and last icons line up with the cards'
+   edges and every gap is equal, whatever the label. Labels are one short word each. */
+:root[data-theme] .home-quick-actions { grid-template-columns: repeat(4, 53px); justify-content: space-between; gap: 0; }
+:root[data-theme] .home-quick-actions button { width: 53px; padding-inline: 0; white-space: nowrap; }
 :root[data-theme] .home-quick-actions button > span {
   position: relative;
   border-radius: 20px;

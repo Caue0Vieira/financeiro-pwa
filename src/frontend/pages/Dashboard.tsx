@@ -33,9 +33,10 @@ export default function Dashboard({
   );
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const editEntry = (item: DashboardData["recent"][number]) => openEditor({ type: "entry", item });
+  // New entries go through the "Novo" button (tab bar / top bar); these are shortcuts to screens.
   const actions: { icon: IconName; label: string; action: () => void }[] = [
-    { icon: "send", label: "Despesa", action: () => openEditor({ type: "entry", kind: "expense" }) },
-    { icon: "deposit", label: "Receita", action: () => openEditor({ type: "entry", kind: "income" }) },
+    { icon: "chart", label: "Investir", action: () => navigate("investments") },
+    { icon: "activity", label: "Extrato", action: () => navigate("activity") },
     { icon: "card", label: "Cartões", action: () => navigate("cards") },
     { icon: "more", label: "Mais", action: () => navigate("more") },
   ];

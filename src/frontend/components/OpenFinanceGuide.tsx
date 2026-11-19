@@ -25,7 +25,7 @@ export function OpenFinanceGuide({ onOpenConnections }: { onOpenConnections: () 
           Crie uma conexão, escolha <strong>MeuPluggy</strong> (não o banco direto), entre com a conta do Meu Pluggy e
           autorize os seus bancos.
         </li>
-        <li>Copie o ID de cada conexão (Item ID). Ele tem o formato 00000000-0000-0000-0000-000000000000.</li>
+        <li>Copie o ID de cada conexão (Item ID). Ele tem o formato <code>00000000-0000-0000-0000-000000000000</code>.</li>
         <li>
           Na tela <strong>Open Finance</strong> (no menu lateral ou em <strong>Mais</strong>, no celular), cole o ID e
           toque em <strong>Vincular</strong>. Repita para cada banco.

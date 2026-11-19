@@ -422,7 +422,8 @@
 .bank-link-help { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: .8rem; text-align: start; }
 
 /* Open Finance guide in Perfil → Ajuda e suporte. */
-.open-finance-guide { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.open-finance-guide { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.open-finance-guide code { font-size: .8rem; word-break: break-all; }
 .open-finance-guide h3 { font-size: .95rem; }
 .open-finance-guide > p { font-size: .86rem; line-height: 1.45; }
 .open-finance-guide .form-details { border-top: 0; }

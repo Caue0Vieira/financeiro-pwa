@@ -31,6 +31,11 @@ export interface Card {
   design?: string;
   accountId?: string;
   archived?: boolean;
+  /** From Open Finance (cents): total limit, what is still available and the open invoice balance. */
+  creditLimit?: number;
+  availableLimit?: number;
+  billBalance?: number;
+  limitsUpdatedAt?: string;
 }
 export interface Investment {
   id: string;

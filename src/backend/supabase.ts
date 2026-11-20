@@ -590,6 +590,10 @@ export function createSupabaseService(
           design: x.design ?? undefined,
           accountId: x.account_id ?? undefined,
           archived: x.archived === true,
+          ...(x.credit_limit_cents != null && { creditLimit: Number(x.credit_limit_cents) }),
+          ...(x.available_limit_cents != null && { availableLimit: Number(x.available_limit_cents) }),
+          ...(x.bill_balance_cents != null && { billBalance: Number(x.bill_balance_cents) }),
+          ...(x.limits_synced_at && { limitsUpdatedAt: x.limits_synced_at }),
         })),
         investments: investments.map((x) => ({
           id: x.id,

@@ -7,7 +7,7 @@ export function createDemoService(): FinanceService {
   const month = currentMonth();
   const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter' }];
   const cards: Card[] = [
-    { id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24, closingDay: 17 },
+    { id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24, closingDay: 17, creditLimit: 800000, availableLimit: 512340, billBalance: 287660 },
   ];
   /** Per-month invoice date adjustments, keyed by `${cardId}:${month}`. */
   const invoiceDateOverrides = new Map<string, { closingDate: string | null; dueDate: string | null }>();

@@ -52,7 +52,26 @@ test('card purchases become expenses; refunds stay positive; bill payments are s
   assert.equal(refund.kind, 'refund');
   assert.equal(refund.amount_cents, 2000);
   assert.equal(mapTransaction({ id: 'c', date: '2026-11-10T12:00:00Z', description: 'PAGAMENTO DE FATURA', amount: -500 }, card, context), null);
-  assert.equal(mapTransaction({ id: 'd', date: '2026-11-10T12:00:00Z', description: 'LOJA', amount: 10, status: 'PENDING' }, card, context), null);
+  // Open-invoice purchases arrive PENDING and are imported; future installments are not.
+  const open = mapTransaction({ id: 'd', date: '2026-11-10T12:00:00Z', description: 'LOJA', amount: 10, status: 'PENDING' }, card, { ...context, today: '2026-11-20' });
+  assert.deepEqual([open.kind, open.amount_cents, open.status], ['expense', -1000, 'confirmed']);
+  assert.equal(mapTransaction({ id: 'e', date: '2026-12-10T12:00:00Z', description: 'LOJA 2/3', amount: 10, status: 'PENDING' }, card, { ...context, today: '2026-11-20' }), null);
+  assert.equal(mapTransaction({ id: 'g', date: '2026-11-10', description: 'PIX', amount: -10, status: 'PENDING' }, bank, context), null);
+});
+
+test('savings pots, own transfers and yields are not counted as spending or income', () => {
+  const owned = { type: 'BANK', owner: 'CAUE TESTE SILVA' };
+  const kindOf = (tx) => {
+    const row = mapTransaction({ id: 'x', date: '2026-11-16', ...tx }, owned, context);
+    return [row.kind, row.category];
+  };
+  assert.deepEqual(kindOf({ description: 'Dinheiro reservado Cofrinho da virada', amount: -5000, category: 'Transfer - Internal' }), ['transfer', 'Cofrinho']);
+  assert.deepEqual(kindOf({ description: 'Dinheiro retirado Casa', amount: 5006.36, category: 'Transfer - Internal' }), ['transfer', 'Cofrinho']);
+  assert.deepEqual(kindOf({ description: 'Dinheiro reservado', amount: 5000, category: 'Investments' }), ['transfer', 'Cofrinho']);
+  assert.deepEqual(kindOf({ description: 'Pix recebido - 5360 Caue Teste Silva', amount: 414.46, category: 'Transfer - PIX' }), ['transfer', 'Transferências']);
+  assert.deepEqual(kindOf({ description: 'Pix enviado - Fulano', amount: -10, category: 'Same person transfer - PIX' }), ['transfer', 'Transferências']);
+  assert.deepEqual(kindOf({ description: 'Rendimentos', amount: 2.52, category: 'Proceeds interests and dividends' }), ['income', 'Rendimentos']);
+  assert.deepEqual(kindOf({ description: 'Pix enviado - Caue Outro', amount: -26.5, category: 'Transfer - PIX' }), ['expense', 'Transferências']);
 });
 
 test('accounts that report purchases as negative are detected', () => {

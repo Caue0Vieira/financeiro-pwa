@@ -10,6 +10,24 @@
 }
 .card-row > svg { color: var(--muted); }
 .card-row:hover { background: var(--accent-soft); }
+.card-entry + .card-entry { border-top: 1px solid var(--line); }
+.card-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 16px;
+  margin: 0 0 12px;
+  padding-inline-start: 50px;
+}
+.card-stats div { display: grid; gap: 2px; min-width: 0; }
+.card-stats dt { color: var(--muted); font-size: .72rem; }
+.card-stats dd { margin: 0; font-size: .92rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card-stats dd small { color: var(--muted); font-size: .72rem; font-weight: 500; }
+.card-limit { grid-column: 1 / -1; }
+.card-limit-bar { display: block; height: 6px; margin-top: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.card-limit-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+@media (max-width: 420px) {
+  .card-stats { padding-inline-start: 0; }
+}
 .reference-header-menu { position: relative; z-index: 4; }
 .reference-header-menu summary { cursor: pointer; list-style: none; }
 .reference-header-menu summary::-webkit-details-marker { display: none; }

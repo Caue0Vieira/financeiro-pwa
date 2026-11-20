@@ -186,7 +186,9 @@ export default function FinanceApp({
         onViewTransactions={() => navigate("activity", "expense")}
       />
     ),
-    cards: <Cards cards={activeCards} accounts={data.accounts} openEditor={openEditor} />,
+    cards: (
+      <Cards cards={activeCards} accounts={data.accounts} invoices={data.invoices} month={data.month} openEditor={openEditor} />
+    ),
     connections: (
       <OpenFinance
         connections={commands.bankConnections}

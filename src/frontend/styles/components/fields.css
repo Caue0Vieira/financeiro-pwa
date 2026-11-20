@@ -16,7 +16,16 @@ input::placeholder { color: var(--muted); }
   background: var(--surface);
   color: var(--text);
 }
-.field input[type="date"], .field input[type="month"] { padding-inline: 8px; }
+/* iOS Safari keeps the native date control's own width (it overflowed the invoice-dates modal on
+   an iPhone 13) unless the native appearance is dropped. */
+.field input[type="date"], .field input[type="month"] {
+  display: block;
+  max-width: 100%;
+  padding-inline: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
 .field input::placeholder { font-weight: 450; opacity: 1; }
 .select-control option { background: Canvas; color: CanvasText; }
 .select-control option:checked { background: var(--accent-soft); color: var(--accent); }

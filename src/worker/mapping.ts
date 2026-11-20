@@ -9,7 +9,16 @@ export type PluggyAccount = {
   name: string;
   marketingName?: string | null;
   number?: string | null;
-  creditData?: { balanceCloseDate?: string | null; balanceDueDate?: string | null } | null;
+  /** BANK: available to spend. CREDIT: open balance of the current invoice (used limit). */
+  balance?: number | null;
+  /** Account holder's name; Pix to or from it is a transfer between the user's own accounts. */
+  owner?: string | null;
+  creditData?: {
+    balanceCloseDate?: string | null;
+    balanceDueDate?: string | null;
+    creditLimit?: number | null;
+    availableCreditLimit?: number | null;
+  } | null;
 };
 
 export type PluggyTransaction = {
@@ -27,7 +36,7 @@ export type TransactionRow = {
   occurred_on: string;
   description: string;
   amount_cents: number;
-  kind: "income" | "expense" | "card_payment" | "investment" | "refund";
+  kind: "income" | "expense" | "card_payment" | "investment" | "refund" | "transfer";
   category: string;
   status: "confirmed";
   source: "pluggy";
@@ -133,21 +142,46 @@ function category(tx: PluggyTransaction, categorize: (description: string) => st
   return fromPluggy ?? (income ? "Receitas" : "Sem categoria");
 }
 
+const plain = (text: string) =>
+  text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
+
+/** Money moved into or out of a savings pot of the same bank (Mercado Pago "Cofrinho", Nubank "Caixinha"…). */
+const isReserve = (tx: PluggyTransaction) =>
+  /\b(dinheiro|valor) (reservado|retirado|guardado|resgatado)\b|\b(cofrinho|caixinha|porquinho)s?\b/.test(plain(tx.description));
+
+/** Transfer between the user's own accounts: Pluggy says so, or the other party is the account holder. */
+function isOwnTransfer(tx: PluggyTransaction, owner: string | null | undefined) {
+  if (/same person transfer|transfer - internal/i.test(tx.category ?? "")) return true;
+  const holder = plain(owner ?? "");
+  return holder.split(" ").length >= 2 && ` ${plain(tx.description)} `.includes(` ${holder} `);
+}
+
+const isYield = (tx: PluggyTransaction) =>
+  /proceeds interests|dividends/i.test(tx.category ?? "") || /^rendimentos?\b/.test(plain(tx.description));
+
 /**
- * One Pluggy transaction as an app row, or null when it must not be imported:
- * pending (its id changes once posted) or a card-side bill payment (the bank side records it).
+ * One Pluggy transaction as an app row, or null when it must not be imported: a pending bank
+ * transaction, a future card installment (the app projects those itself) or a card-side bill
+ * payment (the bank side records it). Purchases of the open card invoice arrive PENDING and keep
+ * their id once posted, so they are imported.
  */
 export function mapTransaction(
   tx: PluggyTransaction,
-  account: Pick<PluggyAccount, "type">,
+  account: Pick<PluggyAccount, "type"> & { owner?: string | null },
   context: {
     closingDay: number | null;
     dueDay: number | null;
     purchasesNegative: boolean;
     categorize: (description: string) => string;
+    /** São Paulo calendar day; card transactions after it are future installments. */
+    today?: string;
   },
 ): TransactionRow | null {
-  if (tx.status === "PENDING" || !tx.amount) return null;
+  if (!tx.amount) return null;
+  if (tx.status === "PENDING") {
+    if (account.type !== "CREDIT") return null;
+    if (saoPauloDate(tx.date) > (context.today ?? saoPauloDate(new Date().toISOString()))) return null;
+  }
   const cents = Math.round(Math.abs(tx.amount) * 100);
   if (!cents) return null;
   const occurredOn = saoPauloDate(tx.date);
@@ -178,10 +212,15 @@ export function mapTransaction(
   if (!income && isCardPayment(tx)) {
     return { ...base, amount_cents: -cents, kind: "card_payment", category: "Cartão" };
   }
+  const amount_cents = income ? cents : -cents;
+  // Neither income nor expense: the money stays with the user.
+  if (isReserve(tx)) return { ...base, amount_cents, kind: "transfer", category: "Cofrinho" };
+  if (isOwnTransfer(tx, account.owner)) return { ...base, amount_cents, kind: "transfer", category: "Transferências" };
+  if (income && isYield(tx)) return { ...base, amount_cents, kind: "income", category: "Rendimentos" };
   const name = category(tx, context.categorize, income);
   return {
     ...base,
-    amount_cents: income ? cents : -cents,
+    amount_cents,
     kind: income ? "income" : name === "Investimentos" ? "investment" : "expense",
     category: name,
   };

@@ -103,19 +103,33 @@ async function registerItem(services: Services, request: Request, context: Conte
   return json(result);
 }
 
-/** "Sincronizar": asks the banks for fresh data (arrives by webhook) and imports what Pluggy has now. */
-async function syncAll(services: Services, request: Request, context: Context) {
+/**
+ * "Sincronizar", one connection per request: asks the bank for fresh data (arrives by webhook)
+ * and imports what Pluggy has now. The app calls it for each connection in turn, because one
+ * invocation on the Workers free plan can't make enough subrequests for several banks (above all
+ * on the first, 12-month import).
+ */
+async function syncOne(services: Services, request: Request, context: Context, itemId: string) {
   const userId = await signedInUser(services, request);
-  const { data, error } = await services.db.from("pluggy_items").select("item_id").eq("user_id", userId);
-  if (error) throw error;
-  let inserted = 0;
-  for (const { item_id } of data ?? []) {
-    // Meu Pluggy items refuse PATCH (they follow the original connection's daily sync); ignore.
-    await services.pluggy.refreshItem(item_id).catch(() => undefined);
-    inserted += (await syncItem(services.db, services.pluggy, userId, item_id)).inserted;
-  }
+  await ownedItem(services, userId, itemId);
+  // Meu Pluggy items refuse PATCH (they follow the original connection's daily sync); ignore.
+  await services.pluggy.refreshItem(itemId).catch(() => undefined);
+  const result = await syncItem(services.db, services.pluggy, userId, itemId);
   context.waitUntil(autoCategorize(services, userId));
-  return json({ inserted });
+  return json(result);
+}
+
+/** Older app versions: syncs only the connection updated longest ago. */
+async function syncStalest(services: Services, request: Request, context: Context) {
+  const userId = await signedInUser(services, request);
+  const { data, error } = await services.db.from("pluggy_items").select("item_id").eq("user_id", userId)
+    .order("last_synced_at", { ascending: true, nullsFirst: true }).limit(1);
+  if (error) throw error;
+  const itemId = data?.[0]?.item_id as string | undefined;
+  if (!itemId) return json({ inserted: 0 });
+  const result = await syncItem(services.db, services.pluggy, userId, itemId);
+  context.waitUntil(autoCategorize(services, userId));
+  return json(result);
 }
 
 /** After a CSV/OFX import in the app: classifies what arrived without a category. */
@@ -210,12 +224,14 @@ async function webhook(services: Services, request: Request, context: Context) {
 }
 
 /**
- * Cron backup for the webhook (see cloudflare.config.ts): imports what Pluggy already has for every
- * stored connection, so purchases arrive even if a notification is lost. One failing item does
- * not stop the others.
+ * Cron backup for the webhook (hourly, see cloudflare.config.ts): imports what Pluggy already has
+ * for the connection synced longest ago, so purchases arrive even if a notification is lost. One
+ * connection per run keeps it within the free plan's subrequest limit; every connection still
+ * comes around every few hours.
  */
-async function syncEveryItem(services: Services) {
-  const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id");
+async function syncStalestItem(services: Services) {
+  const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id")
+    .order("last_synced_at", { ascending: true, nullsFirst: true }).limit(1);
   if (error) throw error;
   for (const { item_id, user_id } of data ?? []) {
     await syncItem(services.db, services.pluggy, user_id, item_id)
@@ -243,7 +259,7 @@ const configured = (env: Env) =>
 export default {
   async scheduled(_controller: unknown, env: Env, context: Context) {
     if (!configured(env)) return;
-    context.waitUntil(syncEveryItem(servicesFor(env)));
+    context.waitUntil(syncStalestItem(servicesFor(env)));
   },
 
   async fetch(request: Request, env: Env, context: Context): Promise<Response> {
@@ -264,10 +280,12 @@ export default {
     try {
       const services = servicesFor(env);
       const itemRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)$/);
+      const itemSyncRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)\/sync$/);
       if (request.method === "POST" && pathname === "/api/pluggy/webhook") return await webhook(services, request, context);
       if (request.method === "POST" && pathname === "/api/pluggy/connect-token") return await connectToken(services, request);
       if (request.method === "POST" && pathname === "/api/pluggy/items") return await registerItem(services, request, context);
-      if (request.method === "POST" && pathname === "/api/pluggy/sync") return await syncAll(services, request, context);
+      if (request.method === "POST" && itemSyncRoute) return await syncOne(services, request, context, decodeURIComponent(itemSyncRoute[1]));
+      if (request.method === "POST" && pathname === "/api/pluggy/sync") return await syncStalest(services, request, context);
       if (request.method === "POST" && pathname === "/api/categorize") return await categorize(services, request);
       if (request.method === "DELETE" && itemRoute) return await removeItem(services, request, decodeURIComponent(itemRoute[1]));
       return json({ error: "not found" }, 404);

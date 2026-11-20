@@ -93,38 +93,39 @@ export async function syncItem(
   for (const account of accounts) {
     const link = links.get(account.id)!;
     const target = link.card_id ? { column: "card_id", id: link.card_id } : { column: "account_id", id: link.account_id! };
+    // Few round trips per account: the Workers free plan allows 50 subrequests per invocation.
+    let closingDay: number | null = null;
+    let dueDay: number | null = null;
     if (link.card_id) {
-      const limits = await db.from("cards").update({
+      const card = await db.from("cards").update({
         bill_balance_cents: cents(account.balance),
         credit_limit_cents: cents(account.creditData?.creditLimit),
         available_limit_cents: cents(account.creditData?.availableCreditLimit),
         limits_synced_at: new Date().toISOString(),
-      }).eq("id", link.card_id).eq("user_id", userId);
-      fail(limits.error);
-    }
-    const transactions = await pluggy.transactions(account.id, { dateFrom });
-    if (!transactions.length) continue;
-
-    let closingDay: number | null = null;
-    let dueDay: number | null = null;
-    if (link.card_id) {
-      const card = await db.from("cards").select("closing_day, due_day").eq("id", link.card_id).single();
+      }).eq("id", link.card_id).eq("user_id", userId).select("closing_day, due_day").single();
       fail(card.error);
       closingDay = card.data!.closing_day;
       dueDay = card.data!.due_day;
     }
+    const transactions = await pluggy.transactions(account.id, { dateFrom });
+    if (!transactions.length) continue;
+
     const purchasesNegative = account.type === "CREDIT" && purchasesAreNegative(transactions);
     const rows = transactions
       .map((tx) => mapTransaction(tx, account, { closingDay, dueDay, purchasesNegative, categorize, today }))
       .filter((row) => row !== null);
 
+    // Everything this account already imported in the window (dates in São Paulo can be a day
+    // before Pluggy's UTC date, hence the margin).
     const known = new Map<string, { kind: string; category: string }>();
-    for (let i = 0; i < rows.length; i += 200) {
-      const ids = rows.slice(i, i + 200).map((row) => row.external_id);
+    const since = new Date(Date.parse(dateFrom) - 3 * 86_400_000).toISOString().slice(0, 10);
+    for (let from = 0; ; from += 1000) {
       const { data, error } = await db.from("transactions").select("external_id, kind, category")
-        .eq("user_id", userId).eq(target.column, target.id).in("external_id", ids);
+        .eq("user_id", userId).eq(target.column, target.id).eq("source", "pluggy").gte("occurred_on", since)
+        .order("id").range(from, from + 999);
       fail(error);
       for (const { external_id, kind, category } of data ?? []) known.set(external_id, { kind, category });
+      if ((data?.length ?? 0) < 1000) break;
     }
 
     const corrections = new Map<string, string[]>();
@@ -149,8 +150,8 @@ export async function syncItem(
         [target.column]: target.id,
         category_source: learned(row.description) === row.category ? "rule" : null,
       }));
-    for (let i = 0; i < fresh.length; i += 200) {
-      const { error } = await db.from("transactions").insert(fresh.slice(i, i + 200));
+    for (let i = 0; i < fresh.length; i += 500) {
+      const { error } = await db.from("transactions").insert(fresh.slice(i, i + 500));
       fail(error);
     }
     inserted += fresh.length;

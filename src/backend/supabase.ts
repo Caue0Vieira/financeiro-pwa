@@ -106,7 +106,22 @@ export function createSupabaseService(
     },
     connectToken: (itemId) => api<{ connectToken: string }>("connect-token", "POST", { itemId }).then((r) => r.connectToken),
     register: (itemId) => api("items", "POST", { itemId }),
-    sync: () => api("sync"),
+    /** One request per connection: a single Worker invocation can't import several banks at once. */
+    async sync() {
+      let inserted = 0;
+      const failed: string[] = [];
+      for (const { itemId, bank } of await bankConnections.list()) {
+        try {
+          inserted += (await api<{ inserted: number }>(`items/${encodeURIComponent(itemId)}/sync`)).inserted;
+        } catch (error) {
+          failed.push(`${bank}: ${error instanceof Error ? error.message : "erro"}`);
+        }
+      }
+      if (failed.length) {
+        throw new Error(`${inserted} lançamento(s) novo(s). Não foi possível sincronizar ${failed.join("; ")}`);
+      }
+      return { inserted };
+    },
     remove: (itemId) => api<void>(`items/${encodeURIComponent(itemId)}`, "DELETE"),
   };
   return {

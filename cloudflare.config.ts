@@ -10,8 +10,9 @@ export default defineConfig({
     workersDev: true,
     previewUrls: false,
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*', '/manifest.webmanifest'] },
-    // Backup for the Pluggy webhook: imports what Pluggy already has for every connection.
-    triggers: [triggers.scheduled({ schedule: '0 */6 * * *' })],
+    // Backup for the Pluggy webhook: each hour imports what Pluggy has for the connection synced
+    // longest ago (one per run, for the free plan's subrequest limit), then runs Workers AI.
+    triggers: [triggers.scheduled({ schedule: '0 * * * *' })],
     // Values are set in Cloudflare, never committed: see README → "Open Finance (Pluggy)".
     env: {
       SUPABASE_URL: bindings.secret(),

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Dashboard } from "../../contracts";
+import type { Dashboard, Invoice } from "../../contracts";
 import { BankIcon } from "../components/BankIcon";
 import { EntryBadge, Entries, Icon, PageHeading } from "../components/common";
 import {
@@ -13,7 +13,7 @@ import {
   type RecurringItem,
 } from "../commitments";
 import { cardLabel, dateLabel, money, monthName } from "../format";
-import type { CommitmentMode, OpenEditor } from "../types";
+import type { CommitmentMode, CommitmentView, OpenEditor } from "../types";
 
 const parts: { id: keyof MonthBreakdown; label: string }[] = [
   { id: "fixed", label: "Contas fixas" },
@@ -21,6 +21,15 @@ const parts: { id: keyof MonthBreakdown; label: string }[] = [
   { id: "invoices", label: "Faturas do cartão" },
   { id: "oneOff", label: "Outras contas" },
 ];
+
+const views: Record<CommitmentView, { title: string; all: string; addLabel?: string; mode?: CommitmentMode }> = {
+  fixed: { title: "Contas fixas", all: "Ver todas as contas fixas", addLabel: "Adicionar conta fixa", mode: "monthly" },
+  subscriptions: { title: "Assinaturas", all: "Ver todas as assinaturas", addLabel: "Adicionar assinatura", mode: "subscription" },
+  installments: { title: "Compras parceladas", all: "Ver todas as parcelas", addLabel: "Adicionar compra parcelada", mode: "installments" },
+  invoices: { title: "Faturas do cartão", all: "Ver todas as faturas" },
+  oneOff: { title: "Contas avulsas", all: "Ver todas as contas avulsas", addLabel: "Adicionar conta avulsa", mode: "once" },
+  income: { title: "Receitas fixas", all: "Ver todas as receitas fixas" },
+};
 
 const monthOnly = (month: string) =>
   new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
@@ -33,39 +42,42 @@ const shortMonth = (month: string) =>
     .replace(".", "")
     .replace(" de ", " ");
 
-export default function Commitments({
-  data,
-  monthControl,
-  setModal,
-}: {
-  data: Dashboard;
-  monthControl: ReactNode;
-  setModal: OpenEditor;
-}) {
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Everything the screens need, computed once per render. */
+function commitmentData(data: Dashboard) {
   const groups = recurringGroups(data, data.month);
   const plans = installmentPlans(data.installments);
-  const breakdown = monthBreakdown(data);
   const oneOff = oneOffEntries(data.upcoming);
   // Installments and recurring card charges already have their own sections.
   const otherCardEntries = data.upcoming.filter(
     (entry) => entry.cardId && !entry.installmentCount && !entry.recurrenceId,
   );
-  const breakdownTotal = parts.reduce((sum, { id }) => sum + breakdown[id], 0);
-  const create = (mode: CommitmentMode) => () => setModal({ type: "commitment", mode });
-  const subscriptionsMonthly = monthlyTotal(groups.subscriptions);
-  const installmentsMonthly = plans.reduce((sum, plan) => sum + plan.amount, 0);
-  const installmentsLeft = plans.reduce((sum, plan) => sum + plan.leftAmount, 0);
+  return { groups, plans, oneOff, otherCardEntries };
+}
 
-  const recurringRows = (items: RecurringItem[]) =>
-    items.map((item) => (
-      <RecurringRow
-        key={item.rule.id}
-        item={item}
-        cardName={data.cards.find(({ id }) => id === item.rule.cardId)?.name}
-        month={data.month}
-        onOpen={() => setModal({ type: "recurrence", item: item.rule })}
-      />
-    ));
+/** Month view: one collapsed section per kind, showing only what falls in the month. */
+export default function Commitments({
+  data,
+  monthControl,
+  setModal,
+  openView,
+}: {
+  data: Dashboard;
+  monthControl: ReactNode;
+  setModal: OpenEditor;
+  openView: (view: CommitmentView) => void;
+}) {
+  const { groups, plans, oneOff, otherCardEntries } = commitmentData(data);
+  const breakdown = monthBreakdown(data);
+  const breakdownTotal = parts.reduce((sum, { id }) => sum + breakdown[id], 0);
+  const rows = rowRenderers(data, setModal);
+  // Rules that only start in a later month are left for the full screen.
+  const started = (items: RecurringItem[]) => items.filter((item) => item.started);
+  const fixed = started(groups.fixed);
+  const subscriptions = started(groups.subscriptions);
+  const income = started(groups.income);
+  const invoicesTotal = data.invoices.reduce((sum, invoice) => sum + invoice.total, 0);
 
   return (
     <>
@@ -116,155 +128,263 @@ export default function Commitments({
           )}
         </section>
 
-        <Section
-          title="Contas fixas"
-          detail={groups.fixed.length ? `${money(monthlyTotal(groups.fixed))} por mês` : undefined}
-          addLabel="Adicionar conta fixa"
-          onAdd={create("monthly")}
+        <Collapsible
+          view="fixed"
+          amount={monthlyTotal(fixed)}
+          detail={count(fixed.length, "conta", "contas")}
+          openView={openView}
         >
-          {groups.fixed.length ? recurringRows(groups.fixed) : (
-            <p className="empty">Aluguel, internet, escola: contas que vencem todo mês aparecem aqui.</p>
-          )}
-        </Section>
+          {fixed.length ? rows.recurring(fixed) : <p className="empty">Nenhuma conta fixa neste mês.</p>}
+        </Collapsible>
 
-        <Section
-          title="Assinaturas"
-          detail={
-            groups.subscriptions.length
-              ? `${money(subscriptionsMonthly)} por mês · ${money(subscriptionsMonthly * 12)} por ano`
-              : undefined
-          }
-          addLabel="Adicionar assinatura"
-          onAdd={create("subscription")}
+        <Collapsible
+          view="subscriptions"
+          amount={monthlyTotal(subscriptions)}
+          detail={count(subscriptions.length, "assinatura", "assinaturas")}
+          openView={openView}
         >
-          {groups.subscriptions.length ? recurringRows(groups.subscriptions) : (
-            <p className="empty">Cadastre streaming, apps e clubes para ver quanto custam no ano.</p>
-          )}
-        </Section>
+          {subscriptions.length ? rows.recurring(subscriptions) : <p className="empty">Nenhuma assinatura neste mês.</p>}
+        </Collapsible>
 
-        <Section
-          title="Compras parceladas"
-          detail={
-            plans.length
-              ? `${money(installmentsMonthly)} neste mês${installmentsLeft ? ` · faltam ${money(installmentsLeft)}` : ""}`
-              : undefined
-          }
-          addLabel="Adicionar compra parcelada"
-          onAdd={create("installments")}
+        <Collapsible
+          view="installments"
+          amount={plans.reduce((sum, plan) => sum + plan.amount, 0)}
+          detail={count(plans.length, "parcela", "parcelas")}
+          openView={openView}
         >
-          {plans.length ? plans.map((plan) => (
-            <InstallmentRow
-              key={plan.entry.id}
-              plan={plan}
-              cardName={data.cards.find(({ id }) => id === plan.entry.cardId)?.name}
-              onOpen={() => setModal({ type: "entry", item: plan.entry })}
-            />
-          )) : (
-            <p className="empty">Nenhuma parcela neste mês. Compras parceladas importadas da fatura também aparecem aqui.</p>
-          )}
-        </Section>
+          {plans.length ? rows.installments(plans, true) : <p className="empty">Nenhuma parcela neste mês.</p>}
+        </Collapsible>
 
-        <section className="panel screen-list">
-          <header className="panel-head"><h2>Faturas do cartão</h2></header>
-          {data.invoices.length ? (
-            data.invoices.map((i) => {
-              const card = data.cards.find(({ id }) => id === i.cardId);
-              const bank = data.accounts.find(({ id }) => id === card?.accountId)?.name;
-              return (
-                <div className="commitment-invoice" key={i.cardId + i.month}>
-                  <div className="transaction">
-                    <BankIcon bank={bank} />
-                    <div className="transaction-info">
-                      <strong>{card?.name || "Cartão"}</strong>
-                      <span>
-                      {[
-                        card?.archived && "Cartão excluído",
-                        i.closingDate && `Fecha ${dateLabel(i.closingDate)}`,
-                        i.dueDate && `Vence ${dateLabel(i.dueDate)}`,
-                        i.adjusted && "Datas ajustadas",
-                        i.paid > 0 && `Pago ${money(i.paid)}`,
-                      ].filter(Boolean).join(" · ")}
-                      </span>
-                    </div>
-                    <span className="transaction-amount">{money(i.total)}</span>
-                  </div>
-                  <div className="commitment-invoice-actions">
-                    {!card?.archived && (
-                      <button className="text-button" onClick={() => setModal({ type: "invoice-dates", item: i })}>
-                        <Icon name="calendar" size={15} /> Editar datas
-                      </button>
-                    )}
-                    {i.total > i.paid && (
-                      <button className="text-button" onClick={() => setModal({ type: "settle", item: i })}>
-                        Vincular pagamento
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="empty">Nenhuma fatura neste mês.</div>
-          )}
+        <Collapsible
+          view="invoices"
+          amount={invoicesTotal}
+          detail={count(data.invoices.length, "fatura", "faturas")}
+          openView={openView}
+        >
+          {data.invoices.length ? rows.invoices(data.invoices, true) : <p className="empty">Nenhuma fatura neste mês.</p>}
           {otherCardEntries.length > 0 && (
-            <details className="form-details">
-              <summary>Outras compras previstas no cartão ({otherCardEntries.length})</summary>
-              <Entries entries={otherCardEntries} onEdit={(item) => setModal({ type: "entry", item })} />
-            </details>
+            <p className="commitment-note">
+              {count(otherCardEntries.length, "outra compra prevista", "outras compras previstas")} no cartão
+            </p>
           )}
-        </section>
+        </Collapsible>
 
-        <Section
-          title="Contas avulsas"
-          detail={oneOff.length ? "Vencem só neste mês" : undefined}
-          addLabel="Adicionar conta avulsa"
-          onAdd={create("once")}
+        <Collapsible
+          view="oneOff"
+          amount={oneOff.reduce((sum, entry) => sum + Math.abs(entry.amount), 0)}
+          detail={count(oneOff.length, "conta", "contas")}
+          openView={openView}
         >
           <Entries
             entries={oneOff}
             onEdit={(item) => setModal({ type: "entry", item })}
-            empty="Boletos e contas que vencem uma única vez, como IPVA ou matrícula."
+            empty="Nenhuma conta avulsa neste mês."
           />
-        </Section>
+        </Collapsible>
 
-        {groups.income.length > 0 && (
-          <Section title="Receitas fixas" detail={`${money(monthlyTotal(groups.income))} por mês`}>
-            {recurringRows(groups.income)}
-          </Section>
+        {income.length > 0 && (
+          <Collapsible
+            view="income"
+            amount={monthlyTotal(income)}
+            detail={count(income.length, "receita", "receitas")}
+            openView={openView}
+            income
+          >
+            {rows.recurring(income)}
+          </Collapsible>
         )}
       </div>
     </>
   );
 }
 
-function Section({
-  title,
+/** Full screen for one kind of commitment: every rule, totals per year and the actions. */
+export function CommitmentDetail({
+  view,
+  data,
+  monthControl,
+  setModal,
+}: {
+  view: CommitmentView;
+  data: Dashboard;
+  monthControl: ReactNode;
+  setModal: OpenEditor;
+}) {
+  const { groups, plans, oneOff, otherCardEntries } = commitmentData(data);
+  const rows = rowRenderers(data, setModal);
+  const { title, addLabel, mode } = views[view];
+
+  let detail: string | undefined;
+  let body: ReactNode;
+  if (view === "fixed" || view === "subscriptions" || view === "income") {
+    const items = groups[view];
+    const monthly = monthlyTotal(items);
+    detail = items.length
+      ? view === "subscriptions"
+        ? `${money(monthly)} por mês · ${money(monthly * 12)} por ano`
+        : `${money(monthly)} por mês`
+      : undefined;
+    body = items.length ? rows.recurring(items) : (
+      <p className="empty">
+        {view === "fixed"
+          ? "Aluguel, internet, escola: contas que vencem todo mês aparecem aqui."
+          : view === "subscriptions"
+            ? "Cadastre streaming, apps e clubes para ver quanto custam no ano."
+            : "Salário e outras receitas que entram todo mês aparecem aqui."}
+      </p>
+    );
+  } else if (view === "installments") {
+    const monthly = plans.reduce((sum, plan) => sum + plan.amount, 0);
+    const left = plans.reduce((sum, plan) => sum + plan.leftAmount, 0);
+    detail = plans.length ? `${money(monthly)} neste mês${left ? ` · faltam ${money(left)}` : ""}` : undefined;
+    body = plans.length ? rows.installments(plans) : (
+      <p className="empty">Nenhuma parcela neste mês. Compras parceladas importadas da fatura também aparecem aqui.</p>
+    );
+  } else if (view === "invoices") {
+    body = (
+      <>
+        {data.invoices.length ? rows.invoices(data.invoices) : <div className="empty">Nenhuma fatura neste mês.</div>}
+        {otherCardEntries.length > 0 && (
+          <details className="form-details">
+            <summary>Outras compras previstas no cartão ({otherCardEntries.length})</summary>
+            <Entries entries={otherCardEntries} onEdit={(item) => setModal({ type: "entry", item })} />
+          </details>
+        )}
+      </>
+    );
+  } else {
+    detail = oneOff.length ? "Vencem só neste mês" : undefined;
+    body = (
+      <Entries
+        entries={oneOff}
+        onEdit={(item) => setModal({ type: "entry", item })}
+        empty="Boletos e contas que vencem uma única vez, como IPVA ou matrícula."
+      />
+    );
+  }
+
+  return (
+    <>
+      <PageHeading
+        title={title}
+        description={detail}
+        action={
+          mode && (
+            <button className="button screen-heading-action" onClick={() => setModal({ type: "commitment", mode })} aria-label={addLabel}>
+              <Icon name="plus" size={16} /> <span>Adicionar</span>
+            </button>
+          )
+        }
+      />
+      <div className="screen-stack commitments">
+        <div className="commitment-detail-month">{monthControl}</div>
+        <section className="panel screen-list commitment-section">{body}</section>
+      </div>
+    </>
+  );
+}
+
+function rowRenderers(data: Dashboard, setModal: OpenEditor) {
+  const cardName = (id?: string) => data.cards.find((card) => card.id === id)?.name;
+  return {
+    recurring: (items: RecurringItem[]) =>
+      items.map((item) => (
+        <RecurringRow
+          key={item.rule.id}
+          item={item}
+          cardName={cardName(item.rule.cardId)}
+          month={data.month}
+          onOpen={() => setModal({ type: "recurrence", item: item.rule })}
+        />
+      )),
+    installments: (plans: InstallmentPlan[], compact = false) =>
+      plans.map((plan) => (
+        <InstallmentRow
+          key={plan.entry.id}
+          plan={plan}
+          compact={compact}
+          cardName={cardName(plan.entry.cardId)}
+          onOpen={() => setModal({ type: "entry", item: plan.entry })}
+        />
+      )),
+    invoices: (invoices: Invoice[], compact = false) =>
+      invoices.map((i) => {
+        const card = data.cards.find(({ id }) => id === i.cardId);
+        const bank = data.accounts.find(({ id }) => id === card?.accountId)?.name;
+        return (
+          <div className="commitment-invoice" key={i.cardId + i.month}>
+            <div className="transaction">
+              <BankIcon bank={bank} />
+              <div className="transaction-info">
+                <strong>{card?.name || "Cartão"}</strong>
+                <span>
+                  {[
+                    card?.archived && "Cartão excluído",
+                    !compact && i.closingDate && `Fecha ${dateLabel(i.closingDate)}`,
+                    i.dueDate && `Vence ${dateLabel(i.dueDate)}`,
+                    !compact && i.adjusted && "Datas ajustadas",
+                    i.paid > 0 && `Pago ${money(i.paid)}`,
+                  ].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+              <span className="transaction-amount">{money(i.total)}</span>
+            </div>
+            {!compact && (
+              <div className="commitment-invoice-actions">
+                {!card?.archived && (
+                  <button className="text-button" onClick={() => setModal({ type: "invoice-dates", item: i })}>
+                    <Icon name="calendar" size={15} /> Editar datas
+                  </button>
+                )}
+                {i.total > i.paid && (
+                  <button className="text-button" onClick={() => setModal({ type: "settle", item: i })}>
+                    Vincular pagamento
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }),
+  };
+}
+
+function Collapsible({
+  view,
+  amount,
   detail,
-  addLabel,
-  onAdd,
+  income = false,
+  openView,
   children,
 }: {
-  title: string;
-  detail?: string;
-  addLabel?: string;
-  onAdd?: () => void;
+  view: CommitmentView;
+  amount: number;
+  detail: string;
+  income?: boolean;
+  openView: (view: CommitmentView) => void;
   children: ReactNode;
 }) {
+  const { title, all } = views[view];
   return (
-    <section className="panel screen-list commitment-section">
-      <header className="panel-head">
-        <div>
-          <h2>{title}</h2>
-          {detail && <p>{detail}</p>}
-        </div>
-        {onAdd && (
-          <button className="icon-button" onClick={onAdd} aria-label={addLabel} title={addLabel}>
-            <Icon name="plus" size={19} />
-          </button>
-        )}
-      </header>
-      {children}
-    </section>
+    <details className="panel commitment-section commitment-collapsible">
+      <summary>
+        <span className="commitment-collapsible-title">
+          <strong>{title}</strong>
+          <small>{detail} no mês</small>
+        </span>
+        <span className={`commitment-collapsible-amount${income ? " income" : ""}`}>
+          {income && amount ? "+ " : ""}
+          {money(amount)}
+        </span>
+        <Icon name="chevronRight" size={16} />
+      </summary>
+      <div className="commitment-collapsible-body screen-list">
+        {children}
+        <button className="text-button commitment-see-all" onClick={() => openView(view)}>
+          {all} <Icon name="arrowRight" size={15} />
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -312,7 +432,17 @@ function RecurringRow({
   );
 }
 
-function InstallmentRow({ plan, cardName, onOpen }: { plan: InstallmentPlan; cardName?: string; onOpen: () => void }) {
+function InstallmentRow({
+  plan,
+  cardName,
+  compact,
+  onOpen,
+}: {
+  plan: InstallmentPlan;
+  cardName?: string;
+  compact: boolean;
+  onOpen: () => void;
+}) {
   const { entry, number, count, amount, left, leftAmount, lastMonth } = plan;
   const progress = `Parcela ${number} de ${count}`;
   const remaining = left
@@ -332,10 +462,14 @@ function InstallmentRow({ plan, cardName, onOpen }: { plan: InstallmentPlan; car
         </span>
         <span className="transaction-amount">{money(amount)}</span>
       </span>
-      <span className="commitment-progress" aria-hidden="true">
-        <i style={{ width: `${(number / count) * 100}%` }} />
-      </span>
-      <span className={`commitment-remaining${left ? "" : " is-last"}`}>{remaining}</span>
+      {!compact && (
+        <>
+          <span className="commitment-progress" aria-hidden="true">
+            <i style={{ width: `${(number / count) * 100}%` }} />
+          </span>
+          <span className={`commitment-remaining${left ? "" : " is-last"}`}>{remaining}</span>
+        </>
+      )}
     </button>
   );
 }

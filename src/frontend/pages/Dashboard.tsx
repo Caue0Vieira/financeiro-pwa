@@ -36,7 +36,7 @@ export default function Dashboard({
   // New entries go through the "Novo" button (tab bar / top bar); these are shortcuts to screens.
   const actions: { icon: IconName; label: string; action: () => void }[] = [
     { icon: "chart", label: "Investir", action: () => navigate("investments") },
-    { icon: "activity", label: "Extrato", action: () => navigate("activity") },
+    { icon: "receipt", label: "Contas", action: () => navigate("commitments") },
     { icon: "card", label: "Cartões", action: () => navigate("cards") },
     { icon: "more", label: "Mais", action: () => navigate("more") },
   ];

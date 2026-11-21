@@ -13,7 +13,7 @@ export const workspace = [
   { id: "commitments", label: "Contas a pagar", icon: "receipt" },
   { id: "investments", label: "Investimentos", icon: "chart" },
   { id: "goals", label: "Metas", icon: "goal" },
-  { id: "assistant", label: "Assistente", icon: "help" },
+  { id: "assistant", label: "Assistente", icon: "sparkles" },
 ] as const;
 
 export const account = [
@@ -30,9 +30,11 @@ export function Sidebar({
   profile,
   preview,
 }: NavigationProps & { profile: Profile; preview: boolean }) {
+  // A commitment's own screen still belongs to "Contas a pagar".
+  const current = page === "commitment-detail" ? "commitments" : page;
   const render = ({ id, label, icon }: { id: Page; label: string; icon: IconName }) => (
-    <button key={id} aria-current={page === id ? "page" : undefined} onClick={() => navigate(id)}>
-      {page === id && (
+    <button key={id} aria-current={current === id ? "page" : undefined} onClick={() => navigate(id)}>
+      {current === id && (
         <motion.span className="nav-active-pill" layoutId="sidebar-active" transition={iosSpring} aria-hidden="true" />
       )}
       <Icon name={icon} />

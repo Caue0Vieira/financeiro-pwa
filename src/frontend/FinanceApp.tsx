@@ -9,17 +9,17 @@ import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./compo
 import { MobileNav, Sidebar } from "./components/Navigation";
 import OpenFinance from "./pages/OpenFinance";
 import Activity, { type ActivityFilter } from "./pages/Activity";
-import Assistant from "./pages/Assistant";
+import Assistant, { AssistantBubble } from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
-import Commitments from "./pages/Commitments";
+import Commitments, { CommitmentDetail } from "./pages/Commitments";
 import Goals from "./pages/Goals";
 import Investments from "./pages/Investments";
 import More from "./pages/More";
 import Planning from "./pages/Planning";
 import Profile from "./pages/Profile";
 import { ThemeToggle } from "./components/ThemeToggle";
-import type { EditModal, FinanceCommands, Page } from "./types";
+import type { CommitmentView, EditModal, FinanceCommands, Page } from "./types";
 import { isSubscription } from "./commitments";
 import "./styles/app.css";
 import "./styles/screens.css";
@@ -61,6 +61,7 @@ export default function FinanceApp({
   const [page, setPage] = useState<Page>("home");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [activityMonth, setActivityMonth] = useState(data.month);
+  const [commitmentView, setCommitmentView] = useState<CommitmentView>("fixed");
   const trail = useRef<Page[]>([]);
   const [modal, setModal] = useState<EditModal>();
   const [notice, setNotice] = useState<Notice>();
@@ -223,10 +224,23 @@ export default function FinanceApp({
         navigate={navigate}
       />
     ),
-    commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
+    commitments: (
+      <Commitments
+        data={data}
+        monthControl={monthControl}
+        setModal={openEditor}
+        openView={(view) => {
+          setCommitmentView(view);
+          navigate("commitment-detail");
+        }}
+      />
+    ),
+    "commitment-detail": (
+      <CommitmentDetail view={commitmentView} data={data} monthControl={monthControl} setModal={openEditor} />
+    ),
     investments: <Investments data={data} setModal={openEditor} />,
     goals: <Goals data={data} openEditor={openEditor} />,
-    assistant: <Assistant data={data} assistant={commands.assistant} />,
+    assistant: <Assistant data={data} commands={commands} showNotice={showNotice} />,
     import: (
       <>
         <PageHeading
@@ -271,7 +285,7 @@ export default function FinanceApp({
               <button className="button secondary top-import" onClick={() => navigate("import")}>
                 <Icon name="upload" size={17} /> Importar
               </button>
-              {page !== "commitments" && (
+              {page !== "commitments" && page !== "commitment-detail" && (
                 <button className="button desktop-add" onClick={add}>
                   <Icon name="plus" size={18} /> Novo lançamento
                 </button>
@@ -321,6 +335,7 @@ export default function FinanceApp({
             {pages[page]}
           </BackNavigation.Provider>
         </main>
+        <AssistantBubble page={page} onOpen={() => navigate("assistant")} />
         <MobileNav page={page} navigate={navigate} onAdd={add} />
         <div className="pull-indicator" ref={pullIndicator} aria-hidden="true">
           <Icon name="refresh" size={20} />

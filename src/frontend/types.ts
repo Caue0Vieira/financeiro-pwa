@@ -6,6 +6,7 @@ export type Page =
   | "analytics"
   | "cards"
   | "commitments"
+  | "commitment-detail"
   | "investments"
   | "goals"
   | "import"
@@ -25,6 +26,9 @@ export type EditModal =
   | { type: "card-picker" }
   | { type: "commitment"; mode?: CommitmentMode }
   | { type: "budget"; item?: never };
+
+/** Kind of commitment opened on its own screen from "Contas a pagar". */
+export type CommitmentView = "fixed" | "subscriptions" | "installments" | "invoices" | "oneOff" | "income";
 
 export type CommitmentMode = "monthly" | "subscription" | "installments" | "once";
 

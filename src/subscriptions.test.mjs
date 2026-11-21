@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { detectSubscriptions, merchantKey, subscriptionTotals } from "./subscriptions.ts";
+import { detectAnnualPlans, detectSubscriptions, merchantKey, subscriptionTotals } from "./subscriptions.ts";
 import { subscriptionItems } from "./notices.ts";
 
 const today = "2026-11-21";
@@ -78,4 +78,21 @@ test("cancelled: stays listed out of the total, and a charge after cancelling is
   assert.equal(spotify.chargedAfterCancel, true);
   assert.deepEqual(subscriptionTotals(list), { monthly: 0, yearly: 0, savedMonthly: 13152 });
   assert.deepEqual(subscriptionItems(list, "2027-02-20"), []);
+});
+
+test("yearly plan paid in 12 installments: known clubs, the Assinaturas category or a decision", () => {
+  const plan = (description, category = "Alimentação", count = 12) => ({ description, category, date: "2026-11-05", amount: 4425, count });
+  const list = detectAnnualPlans(
+    [plan("CP PARC DUO GOURMET"), plan("CP PARC SAMSUNG TV"), plan("Curso online", "Assinaturas"), plan("CP PARC DUO GOURMET", "Alimentação", 10)],
+    new Map(),
+    "2026-11-21",
+  );
+  assert.deepEqual(list.map(({ key }) => key).sort(), ["curso online", "duo gourmet"]);
+  const duo = list.find(({ key }) => key === "duo gourmet");
+  assert.equal(duo.name, "Duo gourmet");
+  assert.equal(duo.cadence, "yearly");
+  assert.equal(duo.yearlyCost, 53100);
+  assert.equal(duo.monthlyCost, 4425);
+  assert.equal(duo.nextDate, "2027-11-05");
+  assert.deepEqual(duo.installments, { count: 12, amount: 4425 });
 });

@@ -13,7 +13,7 @@ export interface ChargeGroup { description: string; charges: [string, number][] 
 
 /** Words of card descriptors and payment intermediaries that don't name the merchant. */
 const noise = new Set([
-  'pg', 'pag', 'pagto', 'pagamento', 'compra', 'compras', 'ec', 'mp', 'pp', 'paypal', 'ebanx', 'dm', 'iz', 'pix',
+  'cp', 'pg', 'pag', 'pagto', 'pagamento', 'compra', 'compras', 'ec', 'mp', 'pp', 'paypal', 'ebanx', 'dm', 'iz', 'pix',
   'debito', 'credito', 'www', 'com', 'br', 'net', 'ltda', 'sa', 'me', 'eireli', 'int', 'internacional', 'parc',
   'assinatura', 'mensalidade', 'plano', 'pagseguro', 'stripe', 'cielo', 'getnet', 'sumup',
 ]);
@@ -112,8 +112,58 @@ export function detectSubscriptions(
       ...(decision === 'cancelled' && { chargedAfterCancel: last.date > (cancelledOn.get(key) ?? today) }),
     });
   }
-  const order: Record<SubscriptionStatus | 'suggested', number> = { suggested: 0, confirmed: 1, cancelled: 2, ignored: 3 };
-  return found.sort((a, b) => order[a.status] - order[b.status] || b.yearlyCost - a.yearlyCost || a.name.localeCompare(b.name, 'pt-BR'));
+  return sortSubscriptions(found);
+}
+
+const order: Record<SubscriptionStatus | 'suggested', number> = { suggested: 0, confirmed: 1, cancelled: 2, ignored: 3 };
+/** To review first, then confirmed, cancelled and ignored; the most expensive first within each. */
+export const sortSubscriptions = (list: DetectedSubscription[]) =>
+  list.sort((a, b) => order[a.status] - order[b.status] || b.yearlyCost - a.yearlyCost || a.name.localeCompare(b.name, 'pt-BR'));
+
+/** First installment of a purchase in installments (positive cents per installment). */
+export interface InstallmentPlan { description: string; category: string; date: string; amount: number; count: number }
+
+/** Clubs and services sold as a yearly plan paid in 12 installments on the card. */
+const annualPlanMerchants = new Set(['duo gourmet', 'prime', 'sem parar', 'veloe', 'conectcar', 'clube']);
+
+/**
+ * Yearly plans paid in 12 installments (Duo Gourmet and the like): the detector leaves installments
+ * out, since most are ordinary purchases. A plan counts when the merchant is a known yearly club,
+ * the purchase is in the "Assinaturas" category, or the user already decided about it.
+ */
+export function detectAnnualPlans(
+  plans: InstallmentPlan[],
+  decisions: Map<string, SubscriptionStatus>,
+  today: string,
+  cancelledOn = new Map<string, string>(),
+): DetectedSubscription[] {
+  const latest = new Map<string, InstallmentPlan>();
+  for (const plan of plans) {
+    const key = merchantKey(plan.description);
+    if (key.length < 2 || plan.count !== 12 || plan.date < addDays(today, -lookbackDays)) continue;
+    const known = annualPlanMerchants.has(key) || key.split(' ').some((word) => annualPlanMerchants.has(word));
+    if (!known && plan.category !== 'Assinaturas' && !decisions.has(key)) continue;
+    if ((latest.get(key)?.date ?? '') < plan.date) latest.set(key, plan);
+  }
+  return [...latest].map(([key, plan]) => {
+    const decision = decisions.get(key);
+    return {
+      key,
+      name: displayName(plan.description.replace(/^cp\s+parc\s+/i, '')),
+      cadence: 'yearly' as const,
+      amount: plan.amount * plan.count,
+      priceChange: 0,
+      monthlyCost: plan.amount,
+      yearlyCost: plan.amount * plan.count,
+      lastDate: plan.date,
+      nextDate: dateInMonth(shiftMonth(plan.date.slice(0, 7), 12), Number(plan.date.slice(8, 10))),
+      charges: 1,
+      isNew: !decision && plan.date >= addDays(today, -62),
+      status: decision ?? 'suggested',
+      installments: { count: plan.count, amount: plan.amount },
+      ...(decision === 'cancelled' && { chargedAfterCancel: plan.date > (cancelledOn.get(key) ?? today) }),
+    };
+  });
 }
 
 /** "NETFLIX.COM" → "Netflix.com"; mixed-case names stay as they are. */

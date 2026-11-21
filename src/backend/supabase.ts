@@ -8,7 +8,7 @@ import { autoRecordDate, chargeDate, chargeInvoiceMonth, chargesInInvoice, type 
 import { normalizePreferences } from "../notices";
 import { summaryFrom } from "../summary";
 import { projectBalance } from "../forecast";
-import { detectSubscriptions, lookbackDays, type ChargeGroup } from "../subscriptions";
+import { detectAnnualPlans, detectSubscriptions, lookbackDays, sortSubscriptions, type ChargeGroup } from "../subscriptions";
 import type {
   Assistant,
   BankConnections,
@@ -217,9 +217,13 @@ export function createSupabaseService(
   const subscriptions: SubscriptionDetector = {
     async list() {
       const today = todayInSaoPaulo();
-      const [charges, decisions] = await Promise.all([
-        db.rpc("subscription_charges", { p_since: addDays(today, -lookbackDays) }),
+      const since = addDays(today, -lookbackDays);
+      const [charges, decisions, plans] = await Promise.all([
+        db.rpc("subscription_charges", { p_since: since }),
         db.from("subscription_decisions").select("merchant_key, status, updated_at"),
+        // First installment of 12x purchases: yearly plans like Duo Gourmet.
+        db.from("transactions").select("description, category, occurred_on, amount_cents, installment_count")
+          .eq("kind", "expense").eq("installment_number", 1).eq("installment_count", 12).gte("occurred_on", since).limit(200),
       ]);
       fail(charges.error);
       fail(decisions.error);
@@ -227,7 +231,14 @@ export function createSupabaseService(
       const decided = new Map(rows.map((row) => [row.merchant_key as string, row.status]));
       const cancelledOn = new Map(rows.filter((row) => row.status === "cancelled")
         .map((row) => [row.merchant_key as string, String(row.updated_at).slice(0, 10)]));
-      return detectSubscriptions((charges.data ?? []) as ChargeGroup[], decided, today, cancelledOn);
+      const installmentPlans = (plans.error ? [] : plans.data ?? []).map((row) => ({
+        description: row.description, category: row.category, date: row.occurred_on,
+        amount: -Number(row.amount_cents), count: row.installment_count,
+      }));
+      return sortSubscriptions([
+        ...detectSubscriptions((charges.data ?? []) as ChargeGroup[], decided, today, cancelledOn),
+        ...detectAnnualPlans(installmentPlans, decided, today, cancelledOn),
+      ]);
     },
     async decide(key, status) {
       if (!status) {

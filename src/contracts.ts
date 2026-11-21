@@ -293,6 +293,8 @@ export interface DetectedSubscription {
   /** Started in the last two months and not reviewed yet. */
   isNew: boolean;
   status: SubscriptionStatus | 'suggested';
+  /** Yearly plan paid in installments on the card (e.g. Duo Gourmet in 12x). */
+  installments?: { count: number; amount: number };
   /** Cancelled, but charged again after the user marked it. */
   chargedAfterCancel?: boolean;
 }

@@ -92,8 +92,12 @@ export default function Subscriptions({
         {item.priceChange < 0 && <span className="badge">Caiu {money(-item.priceChange)}</span>}
       </div>
       <p className="subscription-meta">
-        {item.cadence === "monthly" ? `${money(item.yearlyCost)} por ano` : `${money(item.monthlyCost)} por mês`}
-        {" · "}última em {dateLabel(item.lastDate)} · próxima por volta de {dateLabel(item.nextDate)}
+        {item.installments
+          ? `Plano anual em ${item.installments.count}× de ${money(item.installments.amount)} no cartão · contratado em ${dateLabel(item.lastDate)} · renova por volta de ${dateLabel(item.nextDate)}`
+          : <>
+              {item.cadence === "monthly" ? `${money(item.yearlyCost)} por ano` : `${money(item.monthlyCost)} por mês`}
+              {" · "}última em {dateLabel(item.lastDate)} · próxima por volta de {dateLabel(item.nextDate)}
+            </>}
       </p>
       <div className="subscription-actions">
         {item.status !== "confirmed" && (

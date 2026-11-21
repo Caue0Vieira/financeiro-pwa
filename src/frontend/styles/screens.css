@@ -609,3 +609,9 @@
 .subscription-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .subscription-ignored > summary { cursor: pointer; font-weight: 700; }
 .subscription-ignored > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ——— Exportar dados (Perfil) ——— */
+.export-panel { display: grid; gap: 16px; }
+.export-panel form { display: grid; gap: 10px; }
+.export-panel form .button { justify-self: start; }
+.export-title { font-size: .9rem; }

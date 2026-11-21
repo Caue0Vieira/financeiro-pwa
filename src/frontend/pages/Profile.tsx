@@ -8,6 +8,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { AppIconPicker } from "../components/AppIconPicker";
 import { OpenFinanceGuide } from "../components/OpenFinanceGuide";
 import { PushSettings } from "../components/PushSettings";
+import { ExportPanel } from "../components/ExportPanel";
 import type { FinanceCommands, Page } from "../types";
 import { dateLabel } from "../format";
 
@@ -229,6 +230,9 @@ export default function Profile({
               <button className="text-button" onClick={() => navigate("commitments")}>
                 Ver contas a pagar
               </button>
+            </ProfileSection>
+            <ProfileSection title="Exportar dados" icon="deposit">
+              <ExportPanel data={data} entries={commands.entries} showNotice={showNotice} />
             </ProfileSection>
             <ProfileSection title="Ajuda e suporte" icon="help">
               <p className="subtle">

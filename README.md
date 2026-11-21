@@ -97,6 +97,10 @@ A tela **Assinaturas** (em **Mais**) encontra cobranças recorrentes nos último
 
 No chat do assistente, frases como "gastei 45 no ifood ontem no nubank", "paguei 23,90 de uber no pix", "recebi 300 de freela" ou "comprei uma TV de 3 mil em 10x no inter" viram um cartão de cadastro para conferir e confirmar. O app entende valor, data (hoje, ontem, dia 12, 12/11, "na sexta"), cartão ou conta e estabelecimento sozinho, sem a IA ([parseQuickEntry](src/frontend/assistantActions.ts)), então funciona também na demonstração; frases fora desse padrão seguem para a IA, que pode propor o mesmo cadastro. No app instalado, segure o ícone e toque em **Novo gasto** para abrir o lançamento direto.
 
+### Exportar dados
+
+Em **Perfil → Exportar dados**: a planilha CSV de qualquer período (data, descrição, valor, tipo, categoria, situação, conta ou cartão, fatura, parcela e tags; separada por `;`, com vírgula decimal, abre direto no Excel em português) e o extrato de um mês em PDF, com totais, gastos por categoria e todos os lançamentos. Os dois arquivos são gerados no aparelho ([src/frontend/exports.ts](src/frontend/exports.ts) e um gerador de PDF mínimo em [src/frontend/pdf.ts](src/frontend/pdf.ts)), sem biblioteca nem servidor.
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

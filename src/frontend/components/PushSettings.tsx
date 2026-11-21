@@ -3,6 +3,7 @@ import type { PushNotifications, PushPreferences } from "../../contracts";
 import { defaultPreferences } from "../../notices";
 import { currentDevice, demoEndpoint, isAppleMobile, pushSupport, subscribe, subscriptionKeys, workerRegistration } from "../push";
 import MoneyField from "./MoneyField";
+import { useOnline } from "../useOnline";
 
 type State =
   | { status: "loading" | "install" | "unsupported" | "denied" | "unavailable" | "off" }
@@ -30,23 +31,14 @@ export function PushSettings({
 }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [busy, setBusy] = useState(false);
-  const [online, setOnline] = useState(navigator.onLine);
+  const online = useOnline();
   /** What is typed in the minimum amount; saved once it is a valid amount. */
   const [minimum, setMinimum] = useState<number>();
   const minimumId = useId();
   const saveTimer = useRef<number>(undefined);
   const apple = isAppleMobile(currentDevice());
 
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-      window.clearTimeout(saveTimer.current);
-    };
-  }, []);
+  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
 
   useEffect(() => {
     let active = true;

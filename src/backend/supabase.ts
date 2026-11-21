@@ -323,6 +323,17 @@ export function createSupabaseService(
       fail(error);
       return (data ?? []).map(entry);
     },
+    async entries(from, to) {
+      const rows: Entry[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await db.from("transactions").select("*")
+          .gte("occurred_on", from).lte("occurred_on", to).neq("status", "review")
+          .order("occurred_on").order("id").range(offset, offset + 999);
+        fail(error);
+        rows.push(...(data ?? []).map(entry));
+        if ((data?.length ?? 0) < 1000) return rows;
+      }
+    },
     async confirmImport(payload) {
       const { data, error } = await db.rpc("import_transactions", {
         p_payload: {

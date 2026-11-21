@@ -18,6 +18,8 @@ export interface Entry {
   installmentCount?: number;
   invoiceMonth?: string;
   allocatedAmount?: number;
+  /** Free tags the user gave the entry. */
+  tags?: string[];
 }
 
 export interface Account { id: string; name: string }
@@ -210,6 +212,8 @@ export interface FinanceService {
   dashboard(month: string): Promise<Dashboard>;
   analysis(date: string, period: AnalysisPeriod): Promise<SpendingAnalysis>;
   history(month: string, offset: number, limit: number): Promise<Entry[]>;
+  /** Every recorded entry dated from `from` to `to` (inclusive), for exports. */
+  entries(from: string, to: string): Promise<Entry[]>;
   mutate(action: Action): Promise<void>;
   confirmImport(payload: ImportPayload): Promise<ImportResult>;
   saveProfile(name: string, avatar?: File | null): Promise<void>;

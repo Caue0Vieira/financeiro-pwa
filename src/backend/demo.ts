@@ -245,6 +245,11 @@ export function createDemoService(): FinanceService {
         allocatedAmount: allocations.filter((item) => item.paymentId === entry.id).reduce((sum, item) => sum + item.amount, 0),
       }));
     },
+    async entries(from, to) {
+      return entries.filter((entry) => entry.date >= from && entry.date <= to)
+        .map((entry) => ({ ...entry }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
     async mutate(action) {
       switch (action.type) {
         case 'saveEntry': {

@@ -75,6 +75,27 @@ export default function Assistant({ data, commands, showNotice }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
+  // Keyboard on phones: the visual viewport shrinks; keep the composer right above the keyboard.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const root = document.documentElement;
+    const place = () => {
+      const keyboard = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+      root.style.setProperty("--keyboard-offset", `${keyboard}px`);
+      root.toggleAttribute("data-keyboard", keyboard > 80);
+    };
+    place();
+    viewport.addEventListener("resize", place);
+    viewport.addEventListener("scroll", place);
+    return () => {
+      viewport.removeEventListener("resize", place);
+      viewport.removeEventListener("scroll", place);
+      root.style.removeProperty("--keyboard-offset");
+      root.removeAttribute("data-keyboard");
+    };
+  }, []);
+
   useEffect(() => {
     if (!busy) saveMessages(messages);
     end.current?.scrollIntoView({ block: "end" });

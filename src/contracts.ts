@@ -22,7 +22,14 @@ export interface Entry {
   tags?: string[];
 }
 
-export interface Account { id: string; name: string }
+export interface Account {
+  id: string;
+  name: string;
+  /** Balance the bank reports through Open Finance (sum of its linked accounts); cents. */
+  balance?: number;
+  /** When that balance was last synced (ISO timestamp). */
+  balanceSyncedAt?: string;
+}
 export interface Card {
   id: string;
   name: string;

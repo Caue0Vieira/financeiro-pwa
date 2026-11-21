@@ -115,8 +115,8 @@ export default function Profile({
           </button>
           <div className="profile-shortcuts">
             <button className="profile-shortcut-tile" onClick={() => navigate("cards")}>
-              <Icon name="card" size={19} />
-              <span>Cartões</span>
+              <Icon name="bank" size={19} />
+              <span>Bancos</span>
               <Icon name="chevronRight" size={15} />
             </button>
             <button className="profile-shortcut-tile" onClick={() => navigate("import")}>

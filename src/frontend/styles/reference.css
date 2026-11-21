@@ -25,6 +25,16 @@
 .card-limit { grid-column: 1 / -1; }
 .card-limit-bar { display: block; height: 6px; margin-top: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .card-limit-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+/* Bancos screen: one panel per bank, its balance on top and its cards inside. */
+.bank-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.bank-head .transaction-info strong { font-size: 1rem; }
+.bank-balance { flex: none; font-size: 1.15rem; font-weight: 760; font-variant-numeric: tabular-nums; }
+.bank-balance.negative, .bank-total .negative { color: var(--danger); }
+.bank-card-icon { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.bank-group .card-entry:last-child .card-stats { margin-bottom: 0; }
+.bank-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.bank-total span { color: var(--muted); font-size: .84rem; }
+.bank-total strong { font-size: 1.3rem; font-weight: 760; font-variant-numeric: tabular-nums; }
 @media (max-width: 420px) {
   .card-stats { padding-inline-start: 0; }
 }

@@ -42,7 +42,7 @@ export default function Dashboard({
   const actions: { icon: IconName; label: string; action: () => void }[] = [
     { icon: "chart", label: "Investir", action: () => navigate("investments") },
     { icon: "receipt", label: "Contas", action: () => navigate("commitments") },
-    { icon: "card", label: "Cartões", action: () => navigate("cards") },
+    { icon: "bank", label: "Bancos", action: () => navigate("cards") },
     { icon: "more", label: "Mais", action: () => navigate("more") },
   ];
   const confirmedBalance = data.received - data.expenses;

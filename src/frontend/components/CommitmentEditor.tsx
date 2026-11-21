@@ -230,7 +230,7 @@ export default function CommitmentEditor({
         {displayedError && <p className="inline-error" role="alert">{displayedError}</p>}
         <div className="form-actions">
           {needsCard ? (
-            <button type="button" className="button" onClick={openCards}>Abrir Cartões</button>
+            <button type="button" className="button" onClick={openCards}>Abrir Bancos</button>
           ) : (
             <button className="button" disabled={busy}>{busy ? "Salvando…" : current.save}</button>
           )}

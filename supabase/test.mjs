@@ -206,6 +206,8 @@ await assert.rejects(() => db.query("select * from public.notification_spending(
 await db.query("insert into public.category_budgets(category,amount_cents) values ('Transporte',20000)");
 await assert.rejects(() => db.query("insert into public.category_budgets(category,amount_cents) values ('Lazer',0)"));
 await assert.rejects(() => db.query("select public.monthly_summary_inputs('2026-03-01')"));
+// Open Finance balances are written only by the Worker.
+await assert.rejects(() => db.query("update public.pluggy_accounts set balance_cents=1"));
 // Subscriptions: charges grouped by description for the owner only; decisions per merchant.
 const grouped = (await db.query("select public.subscription_charges('2026-01-01') as v")).rows[0].v;
 const uberGroup = grouped.find((group) => /^uber/i.test(group.description));

@@ -9,7 +9,7 @@ export const workspace = [
   { id: "home", label: "Visão geral", icon: "home" },
   { id: "activity", label: "Transações", icon: "activity" },
   { id: "analytics", label: "Orçamento e Análise", icon: "budget" },
-  { id: "cards", label: "Cartões", icon: "card" },
+  { id: "cards", label: "Bancos", icon: "bank" },
   { id: "commitments", label: "Contas a pagar", icon: "receipt" },
   { id: "subscriptions", label: "Assinaturas", icon: "repeat" },
   { id: "investments", label: "Investimentos", icon: "chart" },

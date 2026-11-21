@@ -9,6 +9,7 @@ import { normalizePreferences } from "../notices";
 import { summaryFrom } from "../summary";
 import { detectAnnualPlans, detectSubscriptions, lookbackDays, sortSubscriptions, type ChargeGroup } from "../subscriptions";
 import type {
+  Account,
   Assistant,
   BankConnections,
   FinanceService,
@@ -62,6 +63,21 @@ const entry = (r: any): Entry => ({
 const fail = (error: any) => {
   if (error) throw error;
 };
+
+/** Adds the balance Open Finance reported for the bank account(s) linked to this app account. */
+function withBankBalance(
+  account: Account,
+  rows: { account_id: string | null; balance_cents: number | string | null; balance_synced_at: string | null }[],
+): Account {
+  const linked = rows.filter((row) => row.account_id === account.id && row.balance_cents != null);
+  if (!linked.length) return account;
+  const synced = linked.map((row) => row.balance_synced_at).filter((x): x is string => !!x).sort().at(-1);
+  return {
+    ...account,
+    balance: linked.reduce((sum, row) => sum + Number(row.balance_cents), 0),
+    ...(synced && { balanceSyncedAt: synced }),
+  };
+}
 
 export function createSupabaseService(
   url: string,
@@ -643,13 +659,15 @@ export function createSupabaseService(
       };
     },
     async dashboard(month): Promise<Dashboard> {
-      const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary] = await Promise.all([
+      const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary, bankBalances] = await Promise.all([
         db.rpc("monthly_dashboard", { p_month: first(month) }),
         db.rpc("nitido_planning", { p_month: first(month) }),
         db.from("card_invoice_dates").select("card_id, closing_on, due_on").eq("month", first(month)),
         db.from("category_budgets").select("category, amount_cents").order("category"),
         db.from("monthly_summaries").select(summaryColumns)
           .eq("month", first(shiftMonth(currentMonth(), -1))).is("dismissed_at", null).maybeSingle(),
+        db.from("pluggy_accounts").select("account_id, balance_cents, balance_synced_at")
+          .not("account_id", "is", null).not("balance_cents", "is", null),
       ]);
       fail(error);
       fail(planning.error);
@@ -863,7 +881,7 @@ export function createSupabaseService(
           name,
           amount,
         })),
-        accounts: accounts.map((x) => ({ id: x.id, name: x.name })),
+        accounts: accounts.map((x) => withBankBalance({ id: x.id, name: x.name }, bankBalances.error ? [] : bankBalances.data ?? [])),
         cards: cards.map((x) => ({
           id: x.id,
           name: x.name,

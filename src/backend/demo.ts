@@ -387,11 +387,14 @@ const demoAssistant: Assistant = {
     const simulation = context.indexOf('SIMULAÇÃO');
     const key = (simulation >= 0 ? context.slice(simulation) : context)
       .split('\n')
-      .filter((line) => /^(Compra:|Mês mais apertado|Meses que ficam|Nenhum mês|Meta mensal|Sobra média|Meta "|Limite disponível|Recebido no mês)/.test(line));
-    const answer = [
-      'Na demonstração o assistente não usa a IA; na sua conta, ela explica estes números em linguagem natural.',
-      ...(key.length ? key.map((line) => `• ${line}`) : [`Sua pergunta foi: "${question}".`]),
-    ].join('\n');
+      .filter((line) => /^(Mês mais apertado|Meses que ficam|Nenhum mês|Meta mensal|Sobra média|Limite disponível|Recebido no mês)/.test(line));
+    const actions = demoActions(question);
+    const answer = actions
+      ? `Na demonstração o assistente não usa a IA; na sua conta, ela entende o pedido e propõe o cadastro.${actions}`
+      : [
+        'Na demonstração o assistente não usa a IA; na sua conta, ela explica estes números em linguagem natural.',
+        ...(key.length ? key.map((line) => `• ${line}`) : [`Sua pergunta foi: "${question}".`]),
+      ].join('\n');
     for (const word of answer.split(/(?<= )/)) {
       onText(word);
       await new Promise((resolve) => setTimeout(resolve, 12));
@@ -399,6 +402,23 @@ const demoAssistant: Assistant = {
     return answer;
   },
 };
+
+/** Imitates the AI's ```acoes block for "anota", "vou receber" and "vou parcelar" in the demo. */
+function demoActions(question: string) {
+  const text = question.toLowerCase();
+  if (!/(anot|cadastr|registr|receb|ganh|assum)/.test(text)) return '';
+  const value = text.match(/(\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?\s*(mil|k)?/);
+  if (!value) return '';
+  const reais = Number(value[1].replace(/\./g, '')) * (value[2] ? 1000 : 1);
+  const count = text.match(/(\d{1,2})\s*(?:x|vezes)\b/);
+  const month = shiftMonth(currentMonth(), 1);
+  const action = /(receb|ganh)/.test(text)
+    ? { tipo: 'receita', descricao: /freela/.test(text) ? 'Freela' : 'Receita extra', valor: reais, mes: month }
+    : count
+      ? { tipo: 'parcelado', descricao: 'Compra parcelada', valor_total: reais, parcelas: Number(count[1]) }
+      : { tipo: 'despesa', descricao: 'Conta prevista', valor: reais, mes: month };
+  return `\nDeixei pronto para você conferir e confirmar.\n\`\`\`acoes\n${JSON.stringify([action])}\n\`\`\``;
+}
 
 function isExpense(entry: Entry) {
   return entry.kind === 'expense' || entry.kind === 'refund';

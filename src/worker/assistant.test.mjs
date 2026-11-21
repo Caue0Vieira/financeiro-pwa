@@ -12,6 +12,8 @@ test('the app context goes in the system prompt and the history is trimmed', () 
   assert.equal(messages[0].role, 'system');
   assert.match(messages[0].content, /SIMULAÇÃO: sobra de R\$ 1\.500,00/);
   assert.match(messages[0].content, /SOMENTE os números/);
+  assert.match(messages[0].content, /```acoes/);
+  assert.match(messages[0].content, /Nunca diga que já cadastrou/);
   // Only valid turns, at most `limits.history` of them, then the question.
   assert.equal(messages.length, 1 + limits.history + 1);
   assert.deepEqual(messages.at(-1), { role: 'user', content: 'Posso comprar a TV?' });

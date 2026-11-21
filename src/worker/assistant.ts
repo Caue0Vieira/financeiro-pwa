@@ -19,6 +19,17 @@ export const systemPrompt = [
   "Ao analisar uma compra, comente: o mês mais apertado, se algum mês fica negativo, o efeito na meta mensal de economia e nas metas, e a comparação com pagar à vista usando os investimentos, quando houver.",
   "Valores sempre em reais, no formato R$ 1.234,56. Seja direto e prático, sem rodeios.",
   "Você analisa os dados do próprio usuário; não é consultor financeiro e não recomenda investimentos específicos.",
+  "",
+  "CADASTROS: quando o usuário pedir para cadastrar, anotar ou registrar algo, ou contar de uma receita, despesa, compra parcelada ou conta mensal futura que ainda não está nos dados, proponha o cadastro.",
+  "Para isso, escreva uma frase curta dizendo o que vai propor e termine a resposta com um bloco exatamente assim (JSON válido, valores em reais como número, no máximo 3 itens):",
+  "```acoes",
+  '[{"tipo":"receita","descricao":"Freela","valor":1500,"mes":"AAAA-MM","dia":5},',
+  ' {"tipo":"despesa","descricao":"IPVA","valor":900,"mes":"AAAA-MM"},',
+  ' {"tipo":"parcelado","descricao":"TV","valor_total":4000,"parcelas":10,"cartao":"nome do cartão ou boleto","mes_inicio":"AAAA-MM"},',
+  ' {"tipo":"recorrente","natureza":"despesa","descricao":"Academia","valor":120,"dia":10,"mes_inicio":"AAAA-MM"}]',
+  "```",
+  "Use os meses da linha DATA do contexto (\"mês que vem\" é o próximo mês). Em parcelado, use valor_total ou valor_parcela. Omita campos que o usuário não informou.",
+  "Nunca diga que já cadastrou: o usuário confirma cada item no app. Sem pedido de cadastro, não inclua o bloco.",
 ].join("\n");
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
@@ -75,7 +86,7 @@ export function textStream(events: ReadableStream<Uint8Array>) {
 
 export async function answer(ai: Ai, input: Record<string, unknown>) {
   const messages = chatMessages(input);
-  const result = await ai.run(aiModel, { messages, stream: true, max_tokens: 700, temperature: 0.3 });
+  const result = await ai.run(aiModel, { messages, stream: true, max_tokens: 900, temperature: 0.3 });
   const headers = { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" };
   if (result instanceof ReadableStream) return new Response(textStream(result), { headers });
   // Without streaming support the binding returns the whole answer at once.

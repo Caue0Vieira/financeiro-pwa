@@ -1,28 +1,39 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { Assistant as AssistantService, AssistantTurn, Dashboard } from "../../contracts";
+import type { Action, Card, Dashboard } from "../../contracts";
+import { todayInSaoPaulo } from "../../date";
 import MoneyField from "../components/MoneyField";
 import { Field } from "../components/Field";
 import { Select } from "../components/Select";
-import { PageHeading } from "../components/common";
+import { Icon, PageHeading } from "../components/common";
 import { cardLabel, money } from "../format";
-import { describeSimulation, financialSummary, simulatePurchase, type PaymentMode, type PurchaseSimulation } from "../purchase";
+import {
+  actionsGuide, parsePurchaseQuestion, proposalFromSimulation, proposalProblem, proposalsFrom, purchaseName,
+  splitAnswer, toMutations, visibleAnswer, type Proposal, type ProposedAction,
+} from "../assistantActions";
+import { describeSimulation, financialSummary, simulatePurchase, type PurchaseSimulation } from "../purchase";
+import type { FinanceCommands, Page } from "../types";
 import "./assistant.css";
 
 const storageKey = "financeiro-assistente";
-const keptMessages = 20;
+const keptMessages = 30;
 const sentHistory = 6;
 
-const suggestions = [
-  "Como estou de orçamento este mês?",
-  "Quando termino de pagar as parcelas?",
-  "Onde estou gastando mais?",
-  "Quanto falta para minhas metas?",
-];
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  simulation?: PurchaseSimulation;
+  /** Card the simulated purchase goes on, and the item name, for "Cadastrar esta compra". */
+  purchase?: { cardId?: string; name: string };
+  proposals?: Proposal[];
+  failed?: boolean;
+}
 
-const modes: { id: PaymentMode; label: string }[] = [
-  { id: "card", label: "Cartão" },
-  { id: "account", label: "Boleto/carnê" },
-  { id: "cash", label: "À vista" },
+const suggestions: { text: string; prompt?: string }[] = [
+  { text: "Simular uma compra", prompt: "Posso comprar uma TV de R$ 4.000 em 10x?" },
+  { text: "Como estou de orçamento este mês?" },
+  { text: "Anotar uma receita do mês que vem", prompt: "Mês que vem vou receber R$ 1.500 de freela, anota pra mim." },
+  { text: "Quando termino de pagar as parcelas?" },
 ];
 
 /** "dez/26" */
@@ -32,16 +43,16 @@ const shortMonth = (month: string) =>
     .replace(".", "")}/${month.slice(2, 4)}`;
 const months = (n: number | null) => (n === null ? "sem previsão" : n === 1 ? "1 mês" : `${n} meses`);
 
-function loadMessages(): AssistantTurn[] {
+function loadMessages(): ChatMessage[] {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-    return Array.isArray(saved) ? saved.slice(-keptMessages) : [];
+    return Array.isArray(saved) ? saved.filter((m) => m && typeof m.content === "string" && m.id).slice(-keptMessages) : [];
   } catch {
     return [];
   }
 }
 
-function saveMessages(messages: AssistantTurn[]) {
+function saveMessages(messages: ChatMessage[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(messages.slice(-keptMessages)));
   } catch {
@@ -49,261 +60,390 @@ function saveMessages(messages: AssistantTurn[]) {
   }
 }
 
-export default function Assistant({ data, assistant }: { data: Dashboard; assistant?: AssistantService }) {
+type Props = {
+  data: Dashboard;
+  commands: Pick<FinanceCommands, "assistant" | "mutate" | "refresh">;
+  showNotice: (message: string, kind?: "success" | "error") => void;
+};
+
+export default function Assistant({ data, commands, showNotice }: Props) {
   const cards = data.cards.filter((card) => !card.archived);
-  const [total, setTotal] = useState<number | undefined>();
-  const [count, setCount] = useState(10);
-  const [mode, setMode] = useState<PaymentMode>(cards.length ? "card" : "account");
-  const [cardId, setCardId] = useState(cards[0]?.id ?? "");
-  const [simulation, setSimulation] = useState<PurchaseSimulation | null>(null);
-  const [messages, setMessages] = useState<AssistantTurn[]>(loadMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [saving, setSaving] = useState("");
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!busy) saveMessages(messages);
-    end.current?.scrollIntoView({ block: "nearest" });
+    end.current?.scrollIntoView({ block: "end" });
   }, [messages, busy]);
 
-  async function ask(question: string, context: string, shown = question) {
-    if (!assistant || busy) return;
-    const history = messages.slice(-sentHistory);
-    setError("");
+  const update = (id: string, change: (message: ChatMessage) => ChatMessage) =>
+    setMessages((list) => list.map((message) => (message.id === id ? change(message) : message)));
+
+  async function send(question: string) {
+    const text = question.trim();
+    if (!text || busy) return;
+    setDraft("");
+    const today = todayInSaoPaulo();
+    const purchase = parsePurchaseQuestion(text, cards);
+    const simulation = purchase ? simulatePurchase(data, { ...purchase, today }) : undefined;
+    const lastSimulation = [...messages].reverse().find((m) => m.simulation)?.simulation;
+    const context = [
+      actionsGuide(today, cards),
+      financialSummary(data),
+      simulation ? describeSimulation(simulation) : lastSimulation ? `ÚLTIMA ${describeSimulation(lastSimulation)}` : "",
+    ].filter(Boolean).join("\n\n");
+    const history = messages.filter((m) => m.content).slice(-sentHistory).map(({ role, content }) => ({ role, content }));
+    const answerId = crypto.randomUUID();
+    setMessages((list) => [
+      ...list,
+      { id: crypto.randomUUID(), role: "user", content: text },
+      {
+        id: answerId, role: "assistant", content: "", simulation,
+        purchase: purchase ? { cardId: purchase.cardId, name: purchaseName(text) } : undefined,
+      },
+    ]);
+    if (!commands.assistant) {
+      update(answerId, (m) => ({ ...m, content: "O assistente não está disponível nesta conta.", failed: true }));
+      return;
+    }
     setBusy(true);
-    setMessages((list) => [...list, { role: "user", content: shown }, { role: "assistant", content: "" }]);
-    const append = (text: string) =>
-      setMessages((list) => {
-        const last = list[list.length - 1];
-        return [...list.slice(0, -1), { ...last, content: last.content + text }];
-      });
+    let raw = "";
     try {
-      await assistant.ask(question, context, history, append);
+      await commands.assistant.ask(text, context, history, (chunk) => {
+        raw += chunk;
+        update(answerId, (m) => ({ ...m, content: visibleAnswer(raw) }));
+      });
+      const { text: shown, raw: actions } = splitAnswer(raw);
+      const proposals = proposalsFrom(actions, { cards, today });
+      update(answerId, (m) => ({ ...m, content: shown, proposals: proposals.length ? proposals : undefined }));
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "O assistente não respondeu.");
-      // Drop the empty answer bubble; the question stays so it can be read again.
-      setMessages((list) => (list[list.length - 1]?.content ? list : list.slice(0, -1)));
+      const message = failure instanceof Error ? failure.message : "O assistente não respondeu.";
+      update(answerId, (m) => ({ ...m, content: m.content || message, failed: !m.content }));
     } finally {
       setBusy(false);
     }
   }
 
-  function simulate(event: FormEvent) {
-    event.preventDefault();
-    if (!total) return;
-    const result = simulatePurchase(data, { total, count, mode, cardId: mode === "card" ? cardId : undefined });
-    setSimulation(result);
-    const how =
-      mode === "cash" ? "à vista" : `em ${result.count}x de ${money(result.installment)}${result.cardName ? ` no ${cardLabel(result.cardName)}` : ""}`;
-    void ask(
-      "Analise esta compra com base na simulação: cabe no meu orçamento? Qual o impacto nas metas e nos investimentos? Vale mais parcelar ou pagar à vista?",
-      `${financialSummary(data)}\n\n${describeSimulation(result)}`,
-      `Simular compra de ${money(result.total)} ${how}`,
-    );
+  function recordSimulation(message: ChatMessage) {
+    if (!message.simulation) return;
+    const proposal = proposalFromSimulation(message.simulation, message.purchase?.cardId, message.purchase?.name ?? "Compra", todayInSaoPaulo());
+    update(message.id, (m) => ({ ...m, proposals: [...(m.proposals ?? []), proposal] }));
   }
 
-  function send(question: string) {
-    const text = question.trim();
-    if (!text) return;
-    setDraft("");
-    const context = simulation ? `${financialSummary(data)}\n\nÚLTIMA ${describeSimulation(simulation)}` : financialSummary(data);
-    void ask(text, context);
+  function editProposal(messageId: string, proposalId: string, change: Partial<ProposedAction>) {
+    update(messageId, (m) => ({
+      ...m,
+      proposals: m.proposals?.map((p) => (p.id === proposalId ? { ...p, action: { ...p.action, ...change } as ProposedAction } : p)),
+    }));
+  }
+
+  async function confirm(messageId: string, proposal: Proposal) {
+    if (saving || proposalProblem(proposal.action)) return;
+    setSaving(proposal.id);
+    try {
+      for (const action of toMutations(proposal.action, todayInSaoPaulo()) as Action[]) await commands.mutate(action);
+      update(messageId, (m) => ({
+        ...m,
+        proposals: m.proposals?.map((p) => (p.id === proposal.id ? { ...p, status: "saved" } : p)),
+      }));
+      showNotice("Cadastrado.");
+      await commands.refresh().catch(() => undefined);
+    } catch (failure) {
+      showNotice(failure instanceof Error ? failure.message : "Não foi possível cadastrar.", "error");
+    } finally {
+      setSaving("");
+    }
   }
 
   function clear() {
     setMessages([]);
-    setSimulation(null);
-    setError("");
     saveMessages([]);
   }
-
-  const peak = simulation ? Math.max(1, ...simulation.months.map((m) => Math.max(Math.abs(m.surplus), Math.abs(m.after)))) : 1;
 
   return (
     <div className="assistant-page">
       <PageHeading
         title="Assistente"
-        description="Simule compras e tire dúvidas sobre suas finanças."
         action={
           messages.length ? (
-            <button className="button secondary" type="button" onClick={clear} disabled={busy}>
-              Limpar conversa
+            <button className="button secondary assistant-clear" type="button" onClick={clear} disabled={busy}>
+              Limpar
             </button>
           ) : undefined
         }
       />
 
-      <form className="panel assistant-simulator" onSubmit={simulate} aria-label="Simular compra">
-        <div className="panel-head">
-          <div>
-            <h2>Simular compra</h2>
-            <p>Veja como uma compra afeta cada mês, suas metas e seus investimentos.</p>
+      <section className="assistant-thread" aria-label="Conversa com o assistente" aria-live="polite">
+        {!messages.length && (
+          <div className="assistant-welcome">
+            <span className="assistant-avatar" aria-hidden="true">
+              <Icon name="sparkles" size={22} />
+            </span>
+            <h2>Como posso ajudar?</h2>
+            <p>
+              Pergunte se uma compra cabe no seu orçamento, como está o mês ou peça para anotar receitas, contas e
+              parcelas. Eu proponho e você confirma antes de cadastrar.
+            </p>
+            <div className="assistant-suggestions">
+              {suggestions.map(({ text, prompt }) => (
+                <button
+                  key={text}
+                  type="button"
+                  onClick={() => {
+                    if (prompt) {
+                      setDraft(prompt);
+                      input.current?.focus();
+                    } else void send(text);
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="segmented assistant-modes" role="group" aria-label="Forma de pagamento">
-          {modes.map(({ id, label }) => (
-            <button key={id} type="button" aria-pressed={mode === id} onClick={() => setMode(id)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="assistant-fields">
-          <MoneyField label="Valor total" name="total" value={total} onValueChange={setTotal} required />
-          {mode !== "cash" && (
-            <Field label="Parcelas">
-              <Select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                {Array.from({ length: 24 }, (_, index) => index + 1).map((n) => (
-                  <option key={n} value={n}>
-                    {n === 1 ? "1x (uma vez)" : `${n}x${total ? ` de ${money(Math.floor(total / n))}` : ""}`}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-          {mode === "card" && cards.length > 0 && (
-            <Field label="Cartão">
-              <Select value={cardId} onChange={(event) => setCardId(event.target.value)}>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>
-                    {cardLabel(card.name)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-        </div>
-        <button className="button" type="submit" disabled={!total || busy}>
-          Simular
+        )}
+        {messages.map((message, index) => (
+          <div key={message.id} className={`assistant-turn ${message.role}`}>
+            {message.simulation && <SimulationCard simulation={message.simulation} />}
+            {(message.content || (busy && index === messages.length - 1)) && (
+              <p className={`assistant-message ${message.role}${message.failed ? " failed" : ""}`}>
+                {message.content || <span className="assistant-typing" aria-label="Escrevendo">•••</span>}
+              </p>
+            )}
+            {message.simulation && !message.proposals?.length && !(busy && index === messages.length - 1) && (
+              <button type="button" className="button secondary assistant-record" onClick={() => recordSimulation(message)}>
+                <Icon name="plus" size={16} /> Cadastrar esta compra
+              </button>
+            )}
+            {message.proposals?.map((proposal) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                cards={cards}
+                saving={saving === proposal.id}
+                onChange={(change) => editProposal(message.id, proposal.id, change)}
+                onConfirm={() => void confirm(message.id, proposal)}
+                onDiscard={() =>
+                  update(message.id, (m) => ({
+                    ...m,
+                    proposals: m.proposals?.map((p) => (p.id === proposal.id ? { ...p, status: "discarded" } : p)),
+                  }))
+                }
+              />
+            ))}
+          </div>
+        ))}
+        <div ref={end} />
+      </section>
+
+      <form
+        className="assistant-composer"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          void send(draft);
+        }}
+      >
+        <textarea
+          ref={input}
+          rows={1}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void send(draft);
+            }
+          }}
+          placeholder="Pergunte ou peça para anotar algo"
+          aria-label="Mensagem"
+          maxLength={600}
+        />
+        <button className="assistant-send" type="submit" disabled={busy || !draft.trim()} aria-label="Enviar">
+          <Icon name="send" size={19} />
         </button>
       </form>
-
-      {simulation && (
-        <section className="panel assistant-result" aria-label="Resultado da simulação">
-          <div className="assistant-stats">
-            <div>
-              <span>{simulation.count > 1 ? "Parcela" : "Pagamento"}</span>
-              <strong>{money(simulation.installment)}</strong>
-              <small>
-                {simulation.count > 1
-                  ? `${shortMonth(simulation.firstMonth)} a ${shortMonth(simulation.lastMonth)}`
-                  : shortMonth(simulation.firstMonth)}
-              </small>
-            </div>
-            <div className={simulation.tightest.after < 0 ? "negative" : ""}>
-              <span>Mês mais apertado</span>
-              <strong>{money(simulation.tightest.after)}</strong>
-              <small>sobra em {shortMonth(simulation.tightest.month)}</small>
-            </div>
-            <div className={simulation.negativeMonths.length ? "negative" : ""}>
-              <span>Meses no vermelho</span>
-              <strong>{simulation.negativeMonths.length}</strong>
-              <small>de {simulation.count}</small>
-            </div>
-            {simulation.monthlyGoal > 0 && (
-              <div className={simulation.monthsBelowGoal.length ? "warning" : ""}>
-                <span>Meta de economia</span>
-                <strong>{simulation.count - simulation.monthsBelowGoal.length}/{simulation.count}</strong>
-                <small>meses atingida</small>
-              </div>
-            )}
-            {simulation.fitsLimit !== null && (
-              <div className={simulation.fitsLimit ? "" : "negative"}>
-                <span>Limite do cartão</span>
-                <strong>{simulation.fitsLimit ? "Cabe" : "Não cabe"}</strong>
-                <small>{money(simulation.availableLimit ?? 0)} livres</small>
-              </div>
-            )}
-            {simulation.investedShare !== null && (
-              <div>
-                <span>Dos investimentos</span>
-                <strong>{Math.round(simulation.investedShare * 100)}%</strong>
-                <small>se pagar com eles</small>
-              </div>
-            )}
-          </div>
-          <ol className="assistant-months" aria-label="Sobra mês a mês">
-            {simulation.months.map((m) => (
-              <li key={m.month}>
-                <span className="assistant-month">{shortMonth(m.month)}</span>
-                <span className="assistant-bar" aria-hidden="true">
-                  <span className="before" style={{ width: `${(Math.max(0, m.surplus) / peak) * 100}%` }} />
-                  <span
-                    className={m.after < 0 ? "after negative" : "after"}
-                    style={{ width: `${(Math.abs(m.after) / peak) * 100}%` }}
-                  />
-                </span>
-                <span className={m.after < 0 ? "assistant-value negative" : "assistant-value"}>{money(m.after)}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="assistant-legend">
-            Barra forte: sobra com a compra. Trecho apagado: o que a parcela consome. Estimativa a partir das contas recorrentes, das parcelas e da média de gastos dos últimos meses.
-          </p>
-          {simulation.targets.some((t) => t.remaining > 0) && (
-            <ul className="assistant-targets" aria-label="Efeito nas metas">
-              {simulation.targets
-                .filter((t) => t.remaining > 0)
-                .map((t) => (
-                  <li key={t.name}>
-                    <strong>{t.name}</strong>
-                    <span>
-                      faltam {money(t.remaining)} · {months(t.monthsBefore)} → {months(t.monthsAfter)} com a compra
-                    </span>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      <section className="panel assistant-chat" aria-label="Conversa com o assistente">
-        {!assistant && <p className="empty">O assistente não está disponível nesta conta.</p>}
-        {assistant && !messages.length && (
-          <div className="assistant-suggestions">
-            {suggestions.map((text) => (
-              <button key={text} type="button" className="button secondary" onClick={() => send(text)} disabled={busy}>
-                {text}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="assistant-messages" aria-live="polite">
-          {messages.map((message, index) => (
-            <p key={index} className={`assistant-message ${message.role}`}>
-              {message.content || (busy && index === messages.length - 1 ? "Pensando…" : "")}
-            </p>
-          ))}
-          <div ref={end} />
-        </div>
-        {error && (
-          <p role="alert" className="assistant-error">
-            {error}
-          </p>
-        )}
-        <form
-          className="assistant-input"
-          onSubmit={(event) => {
-            event.preventDefault();
-            send(draft);
-          }}
-        >
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Pergunte sobre suas finanças"
-            aria-label="Pergunta"
-            maxLength={600}
-            disabled={!assistant}
-          />
-          <button className="button" type="submit" disabled={!assistant || busy || !draft.trim()}>
-            Enviar
-          </button>
-        </form>
-        <small className="assistant-note">
-          Análise automática dos seus próprios dados, não é aconselhamento financeiro.
-        </small>
-      </section>
+      <small className="assistant-note">Análise automática dos seus dados, não é aconselhamento financeiro.</small>
     </div>
+  );
+}
+
+function SimulationCard({ simulation }: { simulation: PurchaseSimulation }) {
+  const peak = Math.max(1, ...simulation.months.map((m) => Math.max(Math.abs(m.surplus), Math.abs(m.after))));
+  return (
+    <section className="assistant-card assistant-simulation" aria-label="Simulação da compra">
+      <header>
+        <Icon name="shopping" size={17} />
+        <strong>
+          {money(simulation.total)}
+          {simulation.count > 1 ? ` em ${simulation.count}x de ${money(simulation.installment)}` : " à vista"}
+        </strong>
+        {simulation.cardName && <small>{cardLabel(simulation.cardName)}</small>}
+      </header>
+      <div className="assistant-stats">
+        <div className={simulation.tightest.after < 0 ? "negative" : ""}>
+          <span>Mês mais apertado</span>
+          <strong>{money(simulation.tightest.after)}</strong>
+          <small>{shortMonth(simulation.tightest.month)}</small>
+        </div>
+        <div className={simulation.negativeMonths.length ? "negative" : ""}>
+          <span>No vermelho</span>
+          <strong>{simulation.negativeMonths.length}</strong>
+          <small>de {simulation.count} {simulation.count === 1 ? "mês" : "meses"}</small>
+        </div>
+        {simulation.monthlyGoal > 0 && (
+          <div className={simulation.monthsBelowGoal.length ? "warning" : ""}>
+            <span>Meta de economia</span>
+            <strong>{simulation.count - simulation.monthsBelowGoal.length}/{simulation.count}</strong>
+            <small>meses atingida</small>
+          </div>
+        )}
+        {simulation.fitsLimit !== null && (
+          <div className={simulation.fitsLimit ? "" : "negative"}>
+            <span>Limite</span>
+            <strong>{simulation.fitsLimit ? "Cabe" : "Não cabe"}</strong>
+            <small>{money(simulation.availableLimit ?? 0)} livres</small>
+          </div>
+        )}
+      </div>
+      <ol className="assistant-months" aria-label="Sobra mês a mês com a compra">
+        {simulation.months.map((m) => (
+          <li key={m.month}>
+            <span className="assistant-month">{shortMonth(m.month)}</span>
+            <span className="assistant-bar" aria-hidden="true">
+              <span className="before" style={{ width: `${(Math.max(0, m.surplus) / peak) * 100}%` }} />
+              <span className={m.after < 0 ? "after negative" : "after"} style={{ width: `${(Math.abs(m.after) / peak) * 100}%` }} />
+            </span>
+            <span className={m.after < 0 ? "assistant-value negative" : "assistant-value"}>{money(m.after)}</span>
+          </li>
+        ))}
+      </ol>
+      {simulation.targets.some((t) => t.remaining > 0) && (
+        <ul className="assistant-targets" aria-label="Efeito nas metas">
+          {simulation.targets.filter((t) => t.remaining > 0).map((t) => (
+            <li key={t.name}>
+              <strong>{t.name}</strong> {months(t.monthsBefore)} → {months(t.monthsAfter)}
+            </li>
+          ))}
+        </ul>
+      )}
+      <small className="assistant-legend">
+        Sobra de cada mês com a compra; o trecho apagado é o que a parcela consome.
+      </small>
+    </section>
+  );
+}
+
+const proposalTitle: Record<string, string> = {
+  income: "Receita prevista",
+  expense: "Conta prevista",
+  installments: "Compra parcelada",
+  recurringincome: "Receita mensal",
+  recurringexpense: "Conta mensal",
+};
+
+function ProposalCard({
+  proposal,
+  cards,
+  saving,
+  onChange,
+  onConfirm,
+  onDiscard,
+}: {
+  proposal: Proposal;
+  cards: Card[];
+  saving: boolean;
+  onChange: (change: Partial<ProposedAction>) => void;
+  onConfirm: () => void;
+  onDiscard: () => void;
+}) {
+  const { action, status } = proposal;
+  const title =
+    action.type === "once" ? proposalTitle[action.flow] : action.type === "installments" ? proposalTitle.installments : proposalTitle[`recurring${action.flow}`];
+  const amount = action.type === "installments" ? action.total : action.amount;
+  if (status !== "pending") {
+    return (
+      <p className={`assistant-card assistant-proposal-done ${status}`}>
+        <Icon name={status === "saved" ? "check" : "close"} size={16} />
+        {title}: {action.description} · {money(amount)} {status === "saved" ? "cadastrada" : "descartada"}
+      </p>
+    );
+  }
+  const problem = proposalProblem(action);
+  return (
+    <form
+      className="assistant-card assistant-proposal"
+      aria-label={`Confirmar ${title}`}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onConfirm();
+      }}
+    >
+      <header>
+        <Icon name={action.type === "installments" ? "card" : action.type === "recurring" ? "repeat" : action.type === "once" && action.flow === "income" ? "arrowDown" : "receipt"} size={17} />
+        <strong>{title}</strong>
+        <small>confira e confirme</small>
+      </header>
+      <div className="assistant-proposal-fields">
+        <Field label="Descrição" value={action.description} onChange={(event) => onChange({ description: event.target.value })} maxLength={80} />
+        <MoneyField
+          label={action.type === "installments" ? "Valor total" : "Valor"}
+          name={`valor-${proposal.id}`}
+          value={amount}
+          onValueChange={(cents) => onChange(action.type === "installments" ? { total: cents ?? 0 } : { amount: cents ?? 0 })}
+        />
+        {action.type === "once" && (
+          <Field label="Data" type="date" value={action.date} onChange={(event) => onChange({ date: event.target.value })} />
+        )}
+        {action.type === "recurring" && (
+          <>
+            <Field label="Todo dia" type="number" min={1} max={31} value={action.day} onChange={(event) => onChange({ day: Number(event.target.value) })} />
+            <Field label="A partir de" type="month" value={action.startMonth} onChange={(event) => onChange({ startMonth: event.target.value })} />
+          </>
+        )}
+        {action.type === "installments" && (
+          <>
+            <Field label="Parcelas">
+              <Select value={action.count} onChange={(event) => onChange({ count: Number(event.target.value) })}>
+                {Array.from({ length: 47 }, (_, i) => i + 2).map((n) => (
+                  <option key={n} value={n}>{n}x de {money(Math.floor(action.total / n))}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Pagar com">
+              <Select
+                value={action.payWith === "account" ? "account" : action.cardId}
+                onChange={(event) =>
+                  onChange(event.target.value === "account" ? { payWith: "account", cardId: "" } : { payWith: "card", cardId: event.target.value })
+                }
+              >
+                {action.payWith === "card" && !action.cardId && <option value="">Escolha o cartão</option>}
+                {cards.map((card) => <option key={card.id} value={card.id}>{cardLabel(card.name)}</option>)}
+                <option value="account">Boleto ou carnê</option>
+              </Select>
+            </Field>
+            <Field label={action.payWith === "card" ? "Primeira fatura" : "Primeira parcela"} type="month" value={action.firstMonth} onChange={(event) => onChange({ firstMonth: event.target.value })} />
+          </>
+        )}
+      </div>
+      {problem && <p className="assistant-problem">{problem}</p>}
+      <div className="assistant-proposal-actions">
+        <button type="button" className="button secondary" onClick={onDiscard} disabled={saving}>Descartar</button>
+        <button type="submit" className="button" disabled={saving || Boolean(problem)}>{saving ? "Cadastrando…" : "Cadastrar"}</button>
+      </div>
+    </form>
+  );
+}
+
+/** Floating bubble that opens the assistant from any screen. */
+export function AssistantBubble({ page, onOpen }: { page: Page; onOpen: () => void }) {
+  if (page === "assistant") return null;
+  return (
+    <button type="button" className="assistant-bubble" onClick={onOpen} aria-label="Abrir assistente">
+      <Icon name="chat" size={24} />
+    </button>
   );
 }

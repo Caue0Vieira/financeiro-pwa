@@ -19,7 +19,7 @@ test("preferences fill defaults and ignore junk", () => {
 test("notices wait for daytime in São Paulo", () => {
   assert.deepEqual(dueKinds(3), []);
   assert.deepEqual(dueKinds(7), ["large_expense"]);
-  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense", "monthly_summary", "negative_balance"]);
+  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense", "monthly_summary", "negative_balance", "subscription"]);
   assert.deepEqual(dueKinds(22).sort(), ["budget", "large_expense"]);
 });
 
@@ -105,6 +105,11 @@ test("composed notices: one per kind, in Portuguese, opening the right screen", 
   assert.equal(summary.title, "Seu resumo de outubro chegou");
   assert.equal(summary.url, "/?abrir=home");
   const [negative] = composeNotices([{ kind: "negative_balance", ref: "2026-11:2026-11-24", label: "Saldo", amount: 21990, date: "2026-11-24" }]);
+  const [fresh] = composeNotices([{ kind: "subscription", ref: "nova:gemini", label: "Google Gemini", amount: 9699 }]);
+  assert.equal(fresh.title, "Nova assinatura: Google Gemini");
+  assert.equal(fresh.url, "/?abrir=subscriptions");
+  const [pricier] = composeNotices([{ kind: "subscription", ref: "preco:netflix:2026-11-18", label: "Netflix", amount: 1599, limit: 1490 }]);
+  assert.equal(plain(pricier.body), "De R$ 14,90 para R$ 15,99.");
   assert.equal(plain(negative.body), "Pela previsão, o saldo fica abaixo de zero no dia 24 e chega a -R$ 219,90. Veja o que vence até lá.");
 });
 

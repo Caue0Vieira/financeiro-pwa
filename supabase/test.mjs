@@ -204,6 +204,13 @@ assert.deepEqual((await db.query("select negative_on, lowest_cents::int as low f
 await assert.rejects(() => db.query("insert into public.balance_forecasts(user_id,month,lowest_cents) values ($1,'2026-11-01',0)", ['00000000-0000-0000-0000-000000000002']));
 await assert.rejects(() => db.query("update public.balance_forecasts set negative_on='2026-12-03'"));
 await assert.rejects(() => db.query("update public.pluggy_accounts set balance_cents=1"));
+// Subscriptions: charges grouped by description for the owner only; decisions per merchant.
+const grouped = (await db.query("select public.subscription_charges('2026-01-01') as v")).rows[0].v;
+const uberGroup = grouped.find((group) => /^uber/i.test(group.description));
+assert.equal(uberGroup.charges.length, 3);
+assert.ok(!grouped.some((group) => group.description === 'Parcelas'));
+await db.query("insert into public.subscription_decisions(merchant_key,status) values ('uber trip','ignored')");
+await assert.rejects(() => db.query("insert into public.subscription_decisions(merchant_key,status) values ('netflix','talvez')"));
 await db.exec('reset role');
 // The Worker (service role, no RLS) sums the month's confirmed spending per category.
 const spending = (await db.query("select category, spent from public.notification_spending('2026-03-01', array[$1::uuid]) order by category", [owner])).rows;
@@ -235,6 +242,8 @@ assert.equal((await db.query('select * from public.push_subscriptions')).rows.le
 assert.equal((await db.query('select * from public.category_budgets')).rows.length,0);
 assert.equal((await db.query('select * from public.monthly_summaries')).rows.length,0);
 assert.equal((await db.query('select * from public.balance_forecasts')).rows.length,0);
+assert.equal((await db.query('select * from public.subscription_decisions')).rows.length,0);
+assert.deepEqual((await db.query("select public.subscription_charges('2026-01-01') as v")).rows[0].v, []);
 assert.deepEqual((await db.query('update public.push_subscriptions set preferences=$1 returning id', ['{}'])).rows, []);
 const otherPlanning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;
 assert.deepEqual(otherPlanning,{budget:0,targets:[],valuations:[]});

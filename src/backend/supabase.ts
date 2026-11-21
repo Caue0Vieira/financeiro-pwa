@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
-import { currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
+import { addDays, currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import { normalizePreferences } from "../notices";
 import { summaryFrom } from "../summary";
 import { projectBalance } from "../forecast";
+import { detectSubscriptions, lookbackDays, type ChargeGroup } from "../subscriptions";
 import type {
   Assistant,
   BankConnections,
@@ -16,6 +17,7 @@ import type {
   PushNotifications,
   Summaries,
   MonthlySummary,
+  SubscriptionDetector,
   Session,
   SavingsTarget,
   Valuation,
@@ -208,12 +210,39 @@ export function createSupabaseService(
     },
     generate: () => api<{ summary: MonthlySummary | null }>("/api/summary").then((result) => result.summary),
   };
+  const subscriptions: SubscriptionDetector = {
+    async list() {
+      const today = todayInSaoPaulo();
+      const [charges, decisions] = await Promise.all([
+        db.rpc("subscription_charges", { p_since: addDays(today, -lookbackDays) }),
+        db.from("subscription_decisions").select("merchant_key, status"),
+      ]);
+      fail(charges.error);
+      fail(decisions.error);
+      const decided = new Map((decisions.data ?? []).map((row) => [row.merchant_key as string, row.status]));
+      return detectSubscriptions((charges.data ?? []) as ChargeGroup[], decided, today);
+    },
+    async decide(key, status) {
+      if (!status) {
+        const { error } = await db.from("subscription_decisions").delete().eq("merchant_key", key);
+        fail(error);
+        return;
+      }
+      const u = await user();
+      const { error } = await db.from("subscription_decisions").upsert(
+        { user_id: u.id, merchant_key: key, status, updated_at: new Date().toISOString() },
+        { onConflict: "user_id,merchant_key" },
+      );
+      fail(error);
+    },
+  };
   return {
     session,
     bankConnections,
     assistant,
     push,
     summaries,
+    subscriptions,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),

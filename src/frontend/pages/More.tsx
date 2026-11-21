@@ -6,6 +6,7 @@ const shortcuts: Partial<Record<Page, { detail: string; tone: string }>> = {
   activity: { detail: "Histórico e busca", tone: "mint" },
   cards: { detail: "Bancos e vencimentos", tone: "teal" },
   commitments: { detail: "Contas e parcelas", tone: "peach" },
+  subscriptions: { detail: "Cobranças recorrentes", tone: "rose" },
   investments: { detail: "Carteira e evolução", tone: "blue" },
   assistant: { detail: "Simular compras e tirar dúvidas", tone: "violet" },
 };

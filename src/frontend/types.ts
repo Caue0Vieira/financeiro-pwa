@@ -13,7 +13,8 @@ export type Page =
   | "connections"
   | "profile"
   | "assistant"
-  | "more";
+  | "more"
+  | "subscriptions";
 export type EditModal =
   | { type: "entry"; item?: Entry; kind?: EntryKind }
   | { type: "investment"; item?: Investment }
@@ -38,5 +39,5 @@ export type OpenEditor = (modal: EditModal) => void;
 
 export type FinanceCommands = Pick<
   FinanceService,
-  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "assistant" | "push" | "summaries"
+  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "assistant" | "push" | "summaries" | "subscriptions"
 > & { refresh: () => Promise<void> };

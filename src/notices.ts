@@ -1,4 +1,4 @@
-import type { PushPreferences } from './contracts.ts';
+import type { DetectedSubscription, PushPreferences } from './contracts.ts';
 import { addDays, invoiceDates, shiftMonth } from './date.ts';
 import { chargeDate } from './recurring.ts';
 
@@ -7,7 +7,7 @@ import { chargeDate } from './recurring.ts';
  * shared by the Worker (which sends them from the cron) and the tests; no I/O here.
  */
 
-export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget' | 'monthly_summary' | 'negative_balance';
+export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget' | 'monthly_summary' | 'negative_balance' | 'subscription';
 
 export const defaultPreferences: PushPreferences = {
   billDue: true,
@@ -17,6 +17,7 @@ export const defaultPreferences: PushPreferences = {
   budget: true,
   monthlySummary: true,
   negativeBalance: true,
+  subscriptions: true,
 };
 
 /** Fills what a stored (or older) preferences object lacks; ignores anything unexpected. */
@@ -33,6 +34,7 @@ export function normalizePreferences(value: unknown): PushPreferences {
     budget: flag('budget'),
     monthlySummary: flag('monthlySummary'),
     negativeBalance: flag('negativeBalance'),
+    subscriptions: flag('subscriptions'),
   };
 }
 
@@ -44,6 +46,7 @@ export const preferenceOf: Record<NoticeKind, keyof PushPreferences> = {
   budget: 'budget',
   monthly_summary: 'monthlySummary',
   negative_balance: 'negativeBalance',
+  subscription: 'subscriptions',
 };
 
 /** Hours (São Paulo) each kind may be sent; outside them it waits for the next run. */
@@ -54,6 +57,7 @@ const sendingHours: Record<NoticeKind, [number, number]> = {
   budget: [8, 22],
   monthly_summary: [9, 21],
   negative_balance: [9, 21],
+  subscription: [9, 21],
 };
 export const dueKinds = (hour: number) =>
   (Object.keys(sendingHours) as NoticeKind[]).filter((kind) => hour >= sendingHours[kind][0] && hour <= sendingHours[kind][1]);
@@ -248,7 +252,41 @@ export function composeNotices(items: NoticeItem[]): Notice[] {
       body: `Pela previsão, o saldo fica abaixo de zero no dia ${Number(first.date!.slice(8, 10))} e chega a ${money(-first.amount)}. Veja o que vence até lá.`,
     });
   }
+  const subscriptions = byKind('subscription');
+  if (subscriptions.length) {
+    const fresh = subscriptions.filter(({ ref }) => ref.startsWith('nova:'));
+    const pricier = subscriptions.filter(({ ref }) => ref.startsWith('preco:'));
+    const [first] = subscriptions;
+    let title: string;
+    let body: string;
+    if (subscriptions.length > 1) {
+      if (!pricier.length) title = `${fresh.length} assinaturas novas`;
+      else if (!fresh.length) title = `${pricier.length} assinaturas mais caras`;
+      else title = 'Mudanças nas assinaturas';
+      body = `${list(subscriptions.slice(0, 3).map(({ label }) => label))}. Confira em Assinaturas.`;
+    } else if (fresh.length) {
+      title = `Nova assinatura: ${first.label}`;
+      body = `Cobrança de ${money(first.amount)}. Confirme ou ignore em Assinaturas.`;
+    } else {
+      title = `${first.label} ficou mais cara`;
+      body = `De ${money(first.limit!)} para ${money(first.amount)}.`;
+    }
+    notices.push({ kind: 'subscription', refs: subscriptions.map(({ ref }) => ref), tag: 'assinaturas', url: screenUrl('subscriptions'), title, body });
+  }
   return notices;
+}
+
+/** New subscriptions not reviewed yet and price increases charged in the last 10 days. */
+export function subscriptionItems(list: DetectedSubscription[], today: string): NoticeItem[] {
+  const items: NoticeItem[] = [];
+  for (const item of list) {
+    if (item.status === 'ignored') continue;
+    if (item.isNew) items.push({ kind: 'subscription', ref: `nova:${item.key}`, label: item.name, amount: item.amount });
+    else if (item.priceChange > 0 && item.lastDate >= addDays(today, -10)) {
+      items.push({ kind: 'subscription', ref: `preco:${item.key}:${item.lastDate}`, label: item.name, amount: item.amount, limit: item.previousAmount });
+    }
+  }
+  return items;
 }
 
 /** Push services browsers use; the Worker only posts to these (no arbitrary URLs). */

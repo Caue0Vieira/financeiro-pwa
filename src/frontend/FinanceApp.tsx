@@ -18,6 +18,7 @@ import Investments from "./pages/Investments";
 import More from "./pages/More";
 import Planning from "./pages/Planning";
 import Profile from "./pages/Profile";
+import Subscriptions from "./pages/Subscriptions";
 import { ThemeToggle } from "./components/ThemeToggle";
 import type { CommitmentView, EditModal, FinanceCommands, Page } from "./types";
 import { isSubscription } from "./commitments";
@@ -48,7 +49,7 @@ const toastVisibleMs = 1500;
 const swipeTabs: Page[] = ["home", "analytics", "goals", "profile"];
 const toastExitMs = 180;
 /** Screens a link can open (`/?abrir=commitments`): push notifications and the manifest shortcuts. */
-const linkPages: Page[] = ["home", "activity", "analytics", "commitments", "cards", "goals", "investments", "assistant", "profile"];
+const linkPages: Page[] = ["home", "activity", "analytics", "commitments", "cards", "goals", "investments", "assistant", "profile", "subscriptions"];
 export function pageFromLink(href: string): Page | undefined {
   try {
     const page = new URL(href, window.location.origin).searchParams.get("abrir") as Page | null;
@@ -289,6 +290,7 @@ export default function FinanceApp({
     ),
     investments: <Investments data={data} setModal={openEditor} />,
     goals: <Goals data={data} openEditor={openEditor} />,
+    subscriptions: <Subscriptions detector={commands.subscriptions} showNotice={showNotice} />,
     assistant: <Assistant data={data} commands={commands} showNotice={showNotice} />,
     import: (
       <>

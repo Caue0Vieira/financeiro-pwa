@@ -136,6 +136,7 @@ export default function App() {
     assistant: service.assistant,
     push: service.push,
     summaries: service.summaries,
+    subscriptions: service.subscriptions,
     refresh,
   };
   return (

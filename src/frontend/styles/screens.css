@@ -589,3 +589,23 @@
 .legend-real, .legend-projected { display: inline-block; width: 18px; border-top: 2.4px solid var(--chart-income); }
 .legend-projected { border-top-style: dashed; }
 .nowrap { white-space: nowrap; }
+
+/* ——— Assinaturas detectadas ——— */
+.subscription-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-bottom: 16px; }
+.subscription-totals span { display: block; font-size: .8rem; opacity: .85; }
+.subscription-totals strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.subscription-totals small { grid-column: 1 / -1; font-size: .76rem; opacity: .8; }
+.subscription-list { display: grid; margin: 8px 0 0; padding: 0; list-style: none; }
+.subscription-item { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.subscription-main { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.subscription-main strong { min-width: 0; overflow-wrap: anywhere; }
+.subscription-amount { flex: none; font-weight: 750; font-variant-numeric: tabular-nums; }
+.subscription-amount small { color: var(--muted); font-weight: 500; }
+.subscription-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.subscription-badges:empty { display: none; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: .74rem; font-weight: 700; }
+.badge.warning { background: var(--warning-soft); color: var(--warning); }
+.subscription-meta { margin: 0; color: var(--muted); font-size: .8rem; }
+.subscription-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.subscription-ignored > summary { cursor: pointer; font-weight: 700; }
+.subscription-ignored > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

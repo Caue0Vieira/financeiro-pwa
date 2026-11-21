@@ -4,10 +4,11 @@ import { addDays, shiftMonth } from "../date.ts";
 import { chargeDate } from "../recurring.ts";
 import {
   billsDueTomorrow, budgetAlerts, composeNotices, dueKinds, invoicesClosing, knownPushService, largeExpenses,
-  normalizePreferences, preferenceOf, wants, type Notice, type NoticeItem, type NoticeKind,
+  normalizePreferences, preferenceOf, subscriptionItems, wants, type Notice, type NoticeItem, type NoticeKind,
 } from "../notices.ts";
 import { sendPush, type PushResult, type VapidKeys } from "./webpush.ts";
 import { monthOnly } from "../summary.ts";
+import { detectSubscriptions, lookbackDays, type ChargeGroup } from "../subscriptions.ts";
 
 /**
  * Sends the push notices (cron and webhook). Everything is loaded for all subscribed users at
@@ -183,6 +184,22 @@ export async function loadItems(db: SupabaseClient, devices: Device[], kinds: No
         kind: "negative_balance", ref: `${month}:${row.negative_on}`, label: "Saldo",
         amount: Math.max(0, -Number(row.lowest_cents)), date: row.negative_on,
       }]);
+    }
+  }
+
+  if (kinds.includes("subscription") && usersWanting("subscription").length) {
+    const wanting = usersWanting("subscription");
+    const [charges, decisions] = await Promise.all([
+      db.rpc("subscription_charges", { p_since: addDays(today, -lookbackDays), p_users: wanting }),
+      db.from("subscription_decisions").select("user_id, merchant_key, status").in("user_id", wanting),
+    ]);
+    fail(charges.error);
+    fail(decisions.error);
+    const groupsByUser = byUser(charges.data as (ChargeGroup & { user_id: string })[]);
+    const decisionsByUser = byUser(decisions.data);
+    for (const userId of wanting) {
+      const decided = new Map((decisionsByUser.get(userId) ?? []).map((row) => [row.merchant_key, row.status]));
+      add(userId, subscriptionItems(detectSubscriptions(groupsByUser.get(userId) ?? [], decided, today), today));
     }
   }
 

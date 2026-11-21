@@ -2,6 +2,7 @@ import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceServi
 import { normalizePreferences } from '../notices.ts';
 import { buildSummary, fallbackText } from '../summary.ts';
 import { projectBalance } from '../forecast.ts';
+import { detectSubscriptions } from '../subscriptions.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -29,6 +30,7 @@ export function createDemoService(): FinanceService {
   /** Months whose summary card was dismissed. */
   const dismissedSummaries = new Set<string>();
   const demoBankBalance = 82000;
+  const subscriptionDecisions = new Map<string, 'confirmed' | 'ignored'>();
   const budgets = new Map<string, number>([[month, 200000]]);
   /** Category limits (same every month), by category name. */
   const categoryBudgets = new Map<string, number>([['Alimentação', 60000], ['Assinaturas', 20000]]);
@@ -68,9 +70,16 @@ export function createDemoService(): FinanceService {
     seed(dateInMonth(period, 5), 'Salário', 625000 + index * 7000, 'income', 'Salário');
     seed(dateInMonth(period, 7), 'Aluguel', -188000, 'expense', 'Moradia');
     seed(dateInMonth(period, 14), 'Mercado', -42180 - Math.abs(index * 3600), 'expense', 'Alimentação');
-    seed(dateInMonth(period, 9), 'Transporte', -17850 + index * 2500, 'expense', 'Transporte');
-    seed(dateInMonth(period, 18), 'Outras despesas', -71000 + index * 5300, 'expense', 'Outros');
+    // Varying more than 15% a month, so they don't look like subscriptions.
+    seed(dateInMonth(period, 9), 'Transporte', -17850 + index * 2500 * (index % 2 ? 2 : -1), 'expense', 'Transporte');
+    seed(dateInMonth(period, 18), 'Outras despesas', -71000 + index * 5300 * (index % 2 ? 3 : -2), 'expense', 'Outros');
+    // Recurring charges for the subscription detector: Netflix gets more expensive this month.
+    seed(dateInMonth(period, 3), 'NETFLIX.COM', -1490, 'expense', 'Assinaturas');
+    seed(dateInMonth(period, 15), 'PG *SMART FIT', -11990, 'expense', 'Saúde');
+    if (index === -1) seed(dateInMonth(period, 4), 'Google Gemini', -9699, 'expense', 'Assinaturas');
   }
+  // Yearly: last year and this month.
+  seed(dateInMonth(shiftMonth(month, -12), 2), 'Registro de domínio', -6990, 'expense', 'Assinaturas');
   const today = todayInSaoPaulo();
   const recentDate = (days: number) => {
     const date = addDays(today, -days);
@@ -78,14 +87,18 @@ export function createDemoService(): FinanceService {
   };
   seed(today, 'Mercado', -4520, 'expense', 'Alimentação');
   seed(today, 'Salário', 120000, 'income', 'Salário');
-  seed(recentDate(1), 'Netflix', -1599, 'expense', 'Assinaturas');
+  /** Day of this month, or today while that day hasn't come yet. */
+  const thisMonthDay = (day: number) => (dateInMonth(month, day) <= today ? dateInMonth(month, day) : today);
+  seed(thisMonthDay(3), 'NETFLIX.COM', -1599, 'expense', 'Assinaturas');
+  seed(dateInMonth(month, 2), 'Registro de domínio', -6990, 'expense', 'Assinaturas');
+  seed(thisMonthDay(15), 'PG *SMART FIT', -11990, 'expense', 'Saúde');
   seed(recentDate(1), 'Cafeteria', -450, 'expense', 'Alimentação');
   seed(recentDate(2), 'Starbucks', -575, 'expense', 'Alimentação');
   seed(recentDate(2), 'Uber', -1240, 'expense', 'Transporte');
   seed(recentDate(3), 'Walmart', -6832, 'expense', 'Compras');
   seed(recentDate(4), 'Farmácia', -2450, 'expense', 'Saúde');
   seed(recentDate(5), 'Claude', -9900, 'expense', 'Assinaturas');
-  seed(recentDate(6), 'Gemini', -9699, 'expense', 'Assinaturas');
+  seed(thisMonthDay(4), 'Google Gemini', -9699, 'expense', 'Assinaturas');
   seed(recentDate(7), 'Prime Video', -1990, 'expense', 'Assinaturas');
   seed(dateInMonth(month, 22), 'Energia elétrica', -16340, 'expense', 'Moradia', { status: 'planned' });
   seed(dateInMonth(month, 24), 'Fone de ouvido', -9990, 'expense', 'Compras', {
@@ -420,6 +433,24 @@ export function createDemoService(): FinanceService {
     async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
     assistant: demoAssistant,
     push: demoPush(),
+    subscriptions: {
+      async list() {
+        const groups = new Map<string, [string, number][]>();
+        for (const entry of entries) {
+          if (entry.status !== 'confirmed' || entry.kind !== 'expense' || (entry.installmentCount ?? 1) > 1) continue;
+          groups.set(entry.description, [...(groups.get(entry.description) ?? []), [entry.date, -entry.amount]]);
+        }
+        return detectSubscriptions(
+          [...groups].map(([description, charges]) => ({ description, charges })),
+          subscriptionDecisions,
+          todayInSaoPaulo(),
+        );
+      },
+      async decide(key, status) {
+        if (status) subscriptionDecisions.set(key, status);
+        else subscriptionDecisions.delete(key);
+      },
+    },
     summaries: {
       async list() {
         return [1, 2, 3].map((back) => summaryOf(shiftMonth(currentMonth(), -back))).filter((item) => item !== null);

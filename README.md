@@ -89,6 +89,10 @@ No dia 1, a partir das 9h, o cron gera o resumo do mês anterior de cada usuári
 
 O painel projeta o saldo dia a dia até o fim do mês ([src/forecast.ts](src/forecast.ts)): linha cheia até hoje e tracejada depois, somando as contas e receitas previstas, as recorrências, as parcelas no boleto e o que falta pagar das faturas no vencimento. Compras no cartão entram só pela fatura. O ponto de partida é o saldo das contas que a Pluggy informa a cada sincronização; sem Open Finance, a previsão parte de zero no dia 1 (a sobra do mês). Quando a previsão mostra um dia negativo, o app guarda esse dia e o cron manda o push "Seu saldo pode ficar negativo". Esse aviso só se atualiza quando o painel é aberto. Aplique a migração [20261121150000_balance_forecast.sql](supabase/migrations/20261121150000_balance_forecast.sql).
 
+### Assinaturas
+
+A tela **Assinaturas** (em **Mais**) encontra cobranças recorrentes nos últimos 13 meses ([src/subscriptions.ts](src/subscriptions.ts)): o mesmo estabelecimento (descrição normalizada, sem códigos como `PG *`), com valor parecido (±15% de uma cobrança para a seguinte) e intervalo mensal ou anual. Mostra o custo por mês e por ano, marca as novas e as que ficaram mais caras e manda push nesses casos. Cada escolha ("É assinatura" ou "Ignorar") fica guardada por estabelecimento e vale para as próximas detecções. Aplique a migração [20261121160000_subscription_detector.sql](supabase/migrations/20261121160000_subscription_detector.sql).
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

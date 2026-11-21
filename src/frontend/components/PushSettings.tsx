@@ -14,6 +14,7 @@ const switches: { key: Exclude<keyof PushPreferences, "largeExpenseMin">; label:
   { key: "largeExpense", label: "Gasto alto", detail: "Compras pelo Open Finance a partir do valor escolhido." },
   { key: "budget", label: "Orçamento", detail: "Quando uma categoria ou o mês chega a 80% e a 100% do limite." },
   { key: "negativeBalance", label: "Saldo negativo", detail: "Quando a previsão do mês mostra um dia com saldo abaixo de zero." },
+  { key: "subscriptions", label: "Assinaturas", detail: "Quando aparece uma assinatura nova ou uma fica mais cara." },
   { key: "monthlySummary", label: "Resumo mensal", detail: "No dia 1, quando o resumo do mês anterior fica pronto." },
 ];
 

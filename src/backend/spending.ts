@@ -40,5 +40,5 @@ export function summarizeSpending(
   }
   const categories = [...categoryTotals].map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount);
-  return { range: { start, end: addDays(end, -1) }, total, previous, points, categories };
+  return { range: { start, end: addDays(end, -1) }, total, previous, points, categories, tags: [] };
 }

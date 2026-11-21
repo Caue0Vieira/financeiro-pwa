@@ -390,6 +390,7 @@ export function EntryRow({
           <span>
             {recentDate}
             {entry.installmentCount ? ` · ${entry.installmentNumber}/${entry.installmentCount}` : ""}
+            {entry.tags?.length ? ` · ${entry.tags.map((tag) => `#${tag}`).join(" ")}` : ""}
           </span>
         </span>
         <span className={`transaction-amount ${entry.amount > 0 ? "income" : ""}`}>{amountText}</span>
@@ -405,6 +406,7 @@ export function EntryRow({
     !grouped && dateLabel(entry.date),
     entry.status === "planned" && "Previsto",
     entry.installmentCount && `${entry.installmentNumber}/${entry.installmentCount}`,
+    entry.tags?.length && entry.tags.map((tag) => `#${tag}`).join(" "),
   ]
     .filter(Boolean)
     .join(" · ");

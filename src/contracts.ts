@@ -81,6 +81,23 @@ export interface SpendingAnalysis {
   previous: number;
   points: { date: string; amount: number }[];
   categories: { name: string; amount: number }[];
+  /** Spending per tag in the period (an entry with two tags counts in both). */
+  tags: { name: string; amount: number }[];
+}
+
+/** Advanced search; every field is optional and they all have to match. */
+export interface EntrySearch {
+  /** Description, category or tag. */
+  text?: string;
+  /** Value range in cents, whatever the sign. */
+  min?: number;
+  max?: number;
+  from?: string;
+  to?: string;
+  /** "card:<id>" or "account:<id>". */
+  source?: string;
+  category?: string;
+  tag?: string;
 }
 
 export interface Dashboard {
@@ -214,6 +231,10 @@ export interface FinanceService {
   history(month: string, offset: number, limit: number): Promise<Entry[]>;
   /** Every recorded entry dated from `from` to `to` (inclusive), for exports. */
   entries(from: string, to: string): Promise<Entry[]>;
+  /** Entries in any month matching the filters, newest first (up to `limit`). */
+  search(filters: EntrySearch, limit?: number): Promise<Entry[]>;
+  /** Tags already used, for suggestions. */
+  tags(): Promise<string[]>;
   mutate(action: Action): Promise<void>;
   confirmImport(payload: ImportPayload): Promise<ImportResult>;
   saveProfile(name: string, avatar?: File | null): Promise<void>;

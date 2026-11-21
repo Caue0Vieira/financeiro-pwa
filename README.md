@@ -105,6 +105,10 @@ Em **Perfil → Exportar dados**: a planilha CSV de qualquer período (data, des
 
 Ao abrir um lançamento salvo, a seção **Comprovantes** anexa fotos ou PDFs. A foto é reduzida no aparelho antes do envio (até 1600 px, JPEG, com uma miniatura de 320 px) e o PDF vai como está, até 5 MB. Os arquivos ficam no bucket privado `receipts` do Supabase Storage, sob o prefixo do `user_id` (como o avatar), e saem junto quando o lançamento é excluído. Aplique a migração [20261121170000_receipts.sql](supabase/migrations/20261121170000_receipts.sql); ela cria o bucket e as políticas.
 
+### Tags e busca avançada
+
+Cada lançamento aceita até 10 tags livres (campo **Tags** no editor; ficam em minúsculas, sem `#`). Em **Transações → Buscar**, o texto procura na descrição, na categoria e nas tags; em **Filtros** dá para combinar faixa de valor (sem importar o sinal), período, conta ou cartão, categoria e tag, e **Buscar em todos os meses** traz até 200 resultados com o total. **Análise** mostra os gastos por tag no período. Aplique a migração [20261121180000_tags.sql](supabase/migrations/20261121180000_tags.sql).
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

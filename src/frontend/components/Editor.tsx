@@ -16,6 +16,7 @@ import { CardModelPicker } from "./HomeCardArt";
 import { Field } from "./Field";
 import { Overlay } from "./Overlay";
 import { ReceiptSection } from "./ReceiptSection";
+import { TagField } from "./TagField";
 import { PayWithField } from "./PayWithField";
 import { Select } from "./Select";
 import MoneyField from "./MoneyField";
@@ -34,11 +35,13 @@ export default function Editor({
   error,
   loadHistory,
   receipts,
+  loadTags,
   close,
   mutate,
   changeModal,
 }: {
   receipts?: Receipts;
+  loadTags?: () => Promise<string[]>;
   modal: Exclude<EditModal, { type: "commitment" | "card-picker" }>;
   data: Dashboard;
   month: string;
@@ -97,6 +100,17 @@ export default function Editor({
     : [];
   const [description, setDescription] = useState(type === "entry" ? (item?.description ?? "") : "");
   const [category, setCategory] = useState(type === "entry" ? (item?.category ?? "") : "");
+  const [tags, setTags] = useState<string[]>(type === "entry" ? (item?.tags ?? []) : []);
+  const [knownTags, setKnownTags] = useState<string[]>([]);
+  useEffect(() => {
+    if (type !== "entry" || !loadTags) return;
+    let active = true;
+    // Suggestions only; offline the field still works without them.
+    loadTags().then((list) => active && setKnownTags(list)).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [type, loadTags]);
   const [paymentMethod, setPaymentMethod] = useState(() => {
     if (type !== "entry") return "";
     if (item?.cardId) return `card:${item.cardId}`;
@@ -196,6 +210,7 @@ export default function Editor({
           accountId,
           cardId,
           invoiceMonth: cardId ? read(f, "invoiceMonth") || month : undefined,
+          tags,
         },
       });
     } else if (type === "budget") void mutate({ type: "saveBudget", month, amount: cents(f, "amount") });
@@ -507,6 +522,7 @@ export default function Editor({
                   />
                 </div>
               </details>
+              <TagField value={tags} onChange={setTags} suggestions={knownTags} />
             </>
           )}
           {type === "investment" && (

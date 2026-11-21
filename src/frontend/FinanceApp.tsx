@@ -248,6 +248,8 @@ export default function FinanceApp({
         month={activityMonth}
         revision={data}
         history={commands.history}
+        search={commands.search}
+        loadTags={commands.tags}
         monthControl={<MonthControl month={activityMonth} onMonth={setActivityMonth} />}
         openEditor={openEditor}
         initialFilter={activityFilter}
@@ -430,6 +432,7 @@ export default function FinanceApp({
             error={editorError}
             loadHistory={commands.history}
             receipts={commands.receipts}
+            loadTags={commands.tags}
             close={() => {
               if (!busy) setModal(undefined);
             }}

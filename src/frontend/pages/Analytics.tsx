@@ -177,6 +177,21 @@ export default function Analytics({
           </section>
         </div>
       )}
+      {analysis && analysis.tags.length > 0 && (
+        <section className="panel screen-list tag-totals" aria-labelledby="tag-totals-title">
+          <header className="panel-head">
+            <h2 id="tag-totals-title">Gastos por tag no período</h2>
+          </header>
+          {analysis.tags.map(({ name, amount }) => (
+            <div className="transaction" key={name}>
+              <div className="transaction-info">
+                <strong>#{name}</strong>
+              </div>
+              <strong className="transaction-amount">{money(amount)}</strong>
+            </div>
+          ))}
+        </section>
+      )}
       {summaries && <SummaryHistory summaries={summaries} />}
     </>
   );

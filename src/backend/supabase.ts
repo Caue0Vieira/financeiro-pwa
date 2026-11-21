@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
 import { prepareReceipt } from "./receiptFile";
+import { filterText, normalizeTags, tagTotals } from "../search";
 import { addDays, currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
@@ -57,6 +58,7 @@ const entry = (r: any): Entry => ({
     r.allocated_amount_cents == null
       ? undefined
       : Number(r.allocated_amount_cents),
+  tags: r.tags ?? [],
 });
 const fail = (error: any) => {
   if (error) throw error;
@@ -391,6 +393,34 @@ export function createSupabaseService(
         if ((data?.length ?? 0) < 1000) return rows;
       }
     },
+    async search(filters, limit = 200) {
+      let query = db.from("transactions").select("*").neq("status", "review")
+        .order("occurred_on", { ascending: false }).order("id", { ascending: false }).limit(limit);
+      const text = filterText(filters.text ?? "");
+      if (text) query = query.or(`description.ilike."*${text}*",category.ilike."*${text}*"`);
+      // The value range applies to the amount whatever its sign (expenses are negative).
+      if (filters.min || filters.max) {
+        const min = filters.min ?? 0;
+        const max = filters.max ?? 100_000_000_00;
+        query = query.or(`and(amount_cents.gte.${min},amount_cents.lte.${max}),and(amount_cents.gte.${-max},amount_cents.lte.${-min})`);
+      }
+      if (filters.from) query = query.gte("occurred_on", filters.from);
+      if (filters.to) query = query.lte("occurred_on", filters.to);
+      if (filters.source?.startsWith("card:")) query = query.eq("card_id", filters.source.slice(5));
+      if (filters.source?.startsWith("account:")) query = query.eq("account_id", filters.source.slice(8));
+      const category = filterText(filters.category ?? "");
+      if (category) query = query.ilike("category", category);
+      if (filters.tag) query = query.contains("tags", [filters.tag]);
+      const { data, error } = await query;
+      fail(error);
+      return (data ?? []).map(entry);
+    },
+    async tags() {
+      const { data, error } = await db.from("transactions").select("tags").neq("tags", "{}").limit(2000);
+      // Until the tags migration is applied there are none.
+      if (error) return [];
+      return [...new Set((data ?? []).flatMap((row) => row.tags as string[]))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    },
     async confirmImport(payload) {
       const { data, error } = await db.rpc("import_transactions", {
         p_payload: {
@@ -418,6 +448,7 @@ export function createSupabaseService(
             card_id: e.cardId ?? null,
             recurring_rule_id: e.recurrenceId ?? null,
             invoice_month: e.invoiceMonth ? first(e.invoiceMonth) : null,
+            ...(e.tags !== undefined && { tags: normalizeTags(e.tags) }),
           };
           if (e.id && !e.id.startsWith("recurrence:")) {
             const { data, error } = await db
@@ -595,12 +626,21 @@ export function createSupabaseService(
     },
     async analysis(date, period) {
       const window = spendingWindow(date, period);
-      const { data, error } = await db.rpc("nitido_expense_days", { p_start: window.previous, p_end: window.end });
+      const [{ data, error }, tagged] = await Promise.all([
+        db.rpc("nitido_expense_days", { p_start: window.previous, p_end: window.end }),
+        db.from("transactions").select("kind, amount_cents, tags")
+          .gte("occurred_on", window.start).lt("occurred_on", window.end).eq("status", "confirmed")
+          .in("kind", ["expense", "refund"]).neq("tags", "{}").limit(5000),
+      ]);
       fail(error);
       const rows = (data as { date: string; category: string; amount: number }[]).map(
         (row) => ({ ...row, amount: Number(row.amount) }),
       );
-      return summarizeSpending(rows, window, period);
+      return {
+        ...summarizeSpending(rows, window, period),
+        // Without the tags migration the query fails and there is no tag section.
+        tags: tagged.error ? [] : tagTotals((tagged.data ?? []).map((row) => ({ kind: row.kind, amount: Number(row.amount_cents), tags: row.tags }))),
+      };
     },
     async dashboard(month): Promise<Dashboard> {
       const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary, bankAccounts] = await Promise.all([

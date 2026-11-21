@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Dashboard, Entry, FinanceService } from "../../contracts";
+import type { Dashboard, Entry, EntrySearch, FinanceService } from "../../contracts";
+import { AdvancedSearch } from "../components/AdvancedSearch";
+import { hasFilters } from "../../search";
+import { money } from "../format";
 import { EntryRow, HeaderMenu, Icon, PageHeading } from "../components/common";
 import { ListSkeleton } from "../components/Skeleton";
 import { todayInSaoPaulo } from "../../date";
 import type { OpenEditor } from "../types";
 
 const batchSize = 100;
-const filters = [
+const kindFilters = [
   ["all", "Todas"],
   ["income", "Receitas"],
   ["expense", "Despesas"],
 ] as const;
-export type ActivityFilter = (typeof filters)[number][0];
+export type ActivityFilter = (typeof kindFilters)[number][0];
 const searchKey = (value: string) =>
   value
     .toLocaleLowerCase("pt-BR")
@@ -38,10 +41,14 @@ export default function Activity({
   openEditor,
   initialFilter,
   onImport,
+  search,
+  loadTags,
 }: {
   month: string;
   revision: Dashboard;
   history: FinanceService["history"];
+  search: FinanceService["search"];
+  loadTags: FinanceService["tags"];
   monthControl: ReactNode;
   openEditor: OpenEditor;
   initialFilter: ActivityFilter;
@@ -54,6 +61,37 @@ export default function Activity({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [retry, setRetry] = useState(0);
+  /** Advanced filters and the result of searching every month with them. */
+  const [filters, setFilters] = useState<EntrySearch>({});
+  const [found, setFound] = useState<{ rows: Entry[]; limited: boolean }>();
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const searchLimit = 200;
+
+  async function runSearch() {
+    const all = { ...filters, text: query.trim() || undefined };
+    if (!hasFilters(all)) {
+      setFound(undefined);
+      return;
+    }
+    setSearching(true);
+    setSearchError("");
+    try {
+      const rows = await search(all, searchLimit);
+      setFound({ rows, limited: rows.length === searchLimit });
+    } catch {
+      setSearchError(navigator.onLine ? "Não foi possível buscar. Tente de novo." : "Sem conexão. A busca em todos os meses volta quando a internet voltar.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    setFilters({});
+    setQuery("");
+    setFound(undefined);
+    setSearchError("");
+  }
   const version = useRef(0);
   const current = result?.month === month ? result : undefined;
   const rows = current?.rows ?? [];
@@ -94,11 +132,15 @@ export default function Activity({
     }
   }
 
-  const visible = rows.filter(
-    (item) =>
-      (filter === "all" || item.kind === filter) &&
-      searchKey(`${item.description} ${item.category}`).includes(searchKey(query.trim())),
-  );
+  // A search across months replaces the month's list; otherwise the text filters what is loaded.
+  const visible = found
+    ? found.rows.filter((item) => filter === "all" || item.kind === filter)
+    : rows.filter(
+      (item) =>
+        (filter === "all" || item.kind === filter) &&
+        searchKey(`${item.description} ${item.category} ${(item.tags ?? []).join(" ")}`).includes(searchKey(query.trim())),
+    );
+  const foundTotal = visible.reduce((sum, item) => sum + item.amount, 0);
   const groups = new Map<string, Entry[]>();
   const today = todayInSaoPaulo();
   for (const entry of visible) {
@@ -118,7 +160,7 @@ export default function Activity({
               aria-label={searchOpen ? "Fechar busca" : "Buscar transações"}
               aria-expanded={searchOpen}
               onClick={() => {
-                if (searchOpen) setQuery("");
+                if (searchOpen) clearSearch();
                 setSearchOpen(!searchOpen);
               }}
             >
@@ -143,24 +185,50 @@ export default function Activity({
       >
         <div className="activity-controls">
           <div className="segmented" role="group" aria-label="Tipo de transação">
-            {filters.map(([value, label]) => (
+            {kindFilters.map(([value, label]) => (
               <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
                 {label}
               </button>
             ))}
           </div>
           {searchOpen && (
-            <label className="search-control">
-              <Icon name="search" size={17} />
-              <input
-                type="search"
-                autoFocus
-                aria-label="Buscar transações"
-                placeholder="Buscar transações"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
+            <form
+              className="advanced-search"
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void runSearch();
+              }}
+            >
+              <label className="search-control">
+                <Icon name="search" size={17} />
+                <input
+                  type="search"
+                  autoFocus
+                  aria-label="Buscar transações"
+                  placeholder="Buscar por descrição, categoria ou tag"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </label>
+              <details>
+                <summary>Filtros: valor, período, conta, categoria e tag</summary>
+                <AdvancedSearch data={revision} filters={filters} onChange={setFilters} loadTags={loadTags} />
+              </details>
+              <div className="advanced-search-actions">
+                <button className="button" disabled={searching}>{searching ? "Buscando…" : "Buscar em todos os meses"}</button>
+                {(found || hasFilters({ ...filters, text: query })) && (
+                  <button type="button" className="text-button" onClick={clearSearch}>Limpar</button>
+                )}
+              </div>
+              {searchError && <p className="inline-error" role="alert">{searchError}</p>}
+              {found && (
+                <p className="search-summary" role="status">
+                  {visible.length} {visible.length === 1 ? "resultado" : "resultados"} em todos os meses · total {money(foundTotal)}
+                  {found.limited && ` (mostrando os ${searchLimit} mais recentes)`}
+                </p>
+              )}
+            </form>
           )}
         </div>
         {error && (
@@ -168,7 +236,7 @@ export default function Activity({
             {error}
           </p>
         )}
-        {rows.length > 0 || (!loadingMonth && !error) ? (
+        {found || rows.length > 0 || (!loadingMonth && !error) ? (
           visible.length ? (
             [...groups]
               .sort(([a], [b]) => Number(a > today) - Number(b > today) || b.localeCompare(a))
@@ -188,13 +256,13 @@ export default function Activity({
               ))
           ) : (
             <p className="empty">
-              {query || filter !== "all"
+              {found || query || filter !== "all"
                 ? "Nenhuma transação encontrada com esses filtros."
                 : "Nenhum lançamento neste mês."}
             </p>
           )
         ) : null}
-        {loadingMonth && rows.length === 0 && (
+        {!found && loadingMonth && rows.length === 0 && (
           <>
             <ListSkeleton rows={7} />
             <span className="skeleton-status" role="status">Carregando transações…</span>
@@ -205,7 +273,7 @@ export default function Activity({
             Tentar novamente
           </button>
         )}
-        {current?.hasMore && (
+        {!found && current?.hasMore && (
           <button className="text-button load-more" disabled={loadingMonth} onClick={() => void loadMore()}>
             Carregar mais
           </button>

@@ -127,6 +127,8 @@ export default function App() {
   const commands: FinanceCommands = {
     history: service.history,
     entries: service.entries,
+    search: service.search,
+    tags: service.tags,
     mutate: service.mutate,
     confirmImport: service.confirmImport,
     saveProfile: service.saveProfile,

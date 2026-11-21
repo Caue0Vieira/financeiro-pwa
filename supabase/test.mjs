@@ -223,6 +223,14 @@ await assert.rejects(() => db.query("update public.receipts set name='renomeado'
 assert.equal((await db.query('select count(*)::int as n from public.receipts')).rows[0].n, 1);
 await db.query('delete from public.transactions where id=$1', [receiptEntry]);
 assert.equal((await db.query('select count(*)::int as n from public.receipts')).rows[0].n, 0);
+// Tags: lower case, trimmed, up to 10; the owner can set them on insert and update.
+const tagged = (await db.query("insert into public.transactions(account_id,occurred_on,description,amount_cents,kind,category,tags) values ($1,'2026-04-05','Hotel',-85000,'expense','Lazer','{viagem rio}') returning id", [account])).rows[0].id;
+await db.query("update public.transactions set tags='{viagem rio,hotel}' where id=$1", [tagged]);
+assert.deepEqual((await db.query("select id from public.transactions where tags @> '{hotel}'")).rows.map((row) => row.id), [tagged]);
+await assert.rejects(() => db.query("update public.transactions set tags='{Maiúscula}' where id=$1", [tagged]));
+await assert.rejects(() => db.query("update public.transactions set tags='{\" espaço\"}' where id=$1", [tagged]));
+await assert.rejects(() => db.query("update public.transactions set tags=$2 where id=$1", [tagged, Array.from({ length: 11 }, (_, i) => `t${i}`)]));
+assert.deepEqual((await db.query("select tags from public.transactions where description='Avulsa'")).rows[0].tags, []);
 await db.exec('reset role');
 // The Worker (service role, no RLS) sums the month's confirmed spending per category.
 const spending = (await db.query("select category, spent from public.notification_spending('2026-03-01', array[$1::uuid]) order by category", [owner])).rows;

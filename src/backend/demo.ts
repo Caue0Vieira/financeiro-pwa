@@ -4,6 +4,7 @@ import { buildSummary, fallbackText } from '../summary.ts';
 import { projectBalance } from '../forecast.ts';
 import { detectSubscriptions } from '../subscriptions.ts';
 import { prepareReceipt } from './receiptFile.ts';
+import { matchesSearch, normalizeTags, tagTotals } from '../search.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -242,15 +243,27 @@ export function createDemoService(): FinanceService {
     },
     async analysis(date, period) {
       const window = spendingWindow(date, period);
-      return summarizeSpending(entries.filter((entry) =>
-        entry.status === 'confirmed' && isExpense(entry) && entry.date >= window.previous && entry.date < window.end
-      ).map(({ date, category, amount }) => ({ date, category, amount: -amount })), window, period);
+      const spending = entries.filter((entry) =>
+        entry.status === 'confirmed' && isExpense(entry) && entry.date >= window.previous && entry.date < window.end);
+      return {
+        ...summarizeSpending(spending.map(({ date, category, amount }) => ({ date, category, amount: -amount })), window, period),
+        tags: tagTotals(spending.filter((entry) => entry.date >= window.start)),
+      };
     },
     async history(period, offset, limit) {
       return items(period).slice(offset, offset + limit).map((entry) => ({
         ...entry,
         allocatedAmount: allocations.filter((item) => item.paymentId === entry.id).reduce((sum, item) => sum + item.amount, 0),
       }));
+    },
+    async search(filters, limit = 200) {
+      return entries.filter((entry) => matchesSearch(entry, filters))
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, limit)
+        .map((entry) => ({ ...entry }));
+    },
+    async tags() {
+      return [...new Set(entries.flatMap((entry) => entry.tags ?? []))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     },
     async entries(from, to) {
       return entries.filter((entry) => entry.date >= from && entry.date <= to)
@@ -266,7 +279,10 @@ export function createDemoService(): FinanceService {
             throw new Error('O pagamento já está vinculado a uma fatura.');
           }
           const id = current?.id ?? crypto.randomUUID();
-          put(entries, { ...action.entry, id, source: current?.source ?? (action.entry.recurrenceId ? 'recurrence' : 'manual') });
+          put(entries, {
+            ...action.entry, id, source: current?.source ?? (action.entry.recurrenceId ? 'recurrence' : 'manual'),
+            tags: normalizeTags(action.entry.tags ?? current?.tags ?? []),
+          });
           return;
         }
         case 'deleteEntry':

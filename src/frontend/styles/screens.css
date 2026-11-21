@@ -632,3 +632,20 @@
 .receipt-add { justify-self: start; cursor: pointer; }
 .receipt-add.disabled { opacity: .55; pointer-events: none; }
 .receipt-add:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ——— Tags (editor) ——— */
+.tag-field { display: grid; gap: 6px; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tag-chips li { display: inline-flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: .8rem; font-weight: 700; }
+.tag-chips button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.tag-chips button:focus-visible { outline: 2px solid var(--focus); }
+.tag-field small { font-size: .76rem; }
+
+/* ——— Busca avançada (Transações) e total por tag (Análise) ——— */
+.advanced-search { display: grid; gap: 10px; width: 100%; }
+.advanced-search details > summary { cursor: pointer; color: var(--accent); font-size: .86rem; font-weight: 700; padding: 4px 0; }
+.advanced-search details > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.advanced-search-fields { margin-top: 8px; }
+.advanced-search-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.search-summary { margin: 0; color: var(--muted); font-size: .84rem; }
+.tag-totals { margin-top: 16px; }

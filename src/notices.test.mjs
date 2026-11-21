@@ -19,7 +19,7 @@ test("preferences fill defaults and ignore junk", () => {
 test("notices wait for daytime in São Paulo", () => {
   assert.deepEqual(dueKinds(3), []);
   assert.deepEqual(dueKinds(7), ["large_expense"]);
-  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense", "monthly_summary"]);
+  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense", "monthly_summary", "negative_balance"]);
   assert.deepEqual(dueKinds(22).sort(), ["budget", "large_expense"]);
 });
 
@@ -104,6 +104,8 @@ test("composed notices: one per kind, in Portuguese, opening the right screen", 
   const [summary] = composeNotices([{ kind: "monthly_summary", ref: "2026-10", label: "outubro", amount: 0 }]);
   assert.equal(summary.title, "Seu resumo de outubro chegou");
   assert.equal(summary.url, "/?abrir=home");
+  const [negative] = composeNotices([{ kind: "negative_balance", ref: "2026-11:2026-11-24", label: "Saldo", amount: 21990, date: "2026-11-24" }]);
+  assert.equal(plain(negative.body), "Pela previsão, o saldo fica abaixo de zero no dia 24 e chega a -R$ 219,90. Veja o que vence até lá.");
 });
 
 test("a device only gets what it wants", () => {

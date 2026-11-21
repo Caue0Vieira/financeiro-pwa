@@ -85,6 +85,10 @@ O cron de hora em hora reveza o trabalho por causa do limite de 50 subrequisiç�
 
 No dia 1, a partir das 9h, o cron gera o resumo do mês anterior de cada usuário com lançamentos (com os dias 2 e 3 de reserva, se algo falhar): entradas, saídas, saldo, as 3 categorias que mais cresceram, a meta de economia do mês (definida pelo cartão do resumo) e o maior gasto. Os números vêm de [src/summary.ts](src/summary.ts); o Workers AI só escreve um comentário curto e, se a resposta trouxer qualquer número, o app usa um texto próprio. O resumo aparece como cartão no painel, fica no histórico em **Orçamento e Análise → Análise** e chega como push. Aplique a migração [20261121140000_monthly_summaries.sql](supabase/migrations/20261121140000_monthly_summaries.sql); não há segredo novo.
 
+### Previsão de saldo
+
+O painel projeta o saldo dia a dia até o fim do mês ([src/forecast.ts](src/forecast.ts)): linha cheia até hoje e tracejada depois, somando as contas e receitas previstas, as recorrências, as parcelas no boleto e o que falta pagar das faturas no vencimento. Compras no cartão entram só pela fatura. O ponto de partida é o saldo das contas que a Pluggy informa a cada sincronização; sem Open Finance, a previsão parte de zero no dia 1 (a sobra do mês). Quando a previsão mostra um dia negativo, o app guarda esse dia e o cron manda o push "Seu saldo pode ficar negativo". Esse aviso só se atualiza quando o painel é aberto. Aplique a migração [20261121150000_balance_forecast.sql](supabase/migrations/20261121150000_balance_forecast.sql).
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

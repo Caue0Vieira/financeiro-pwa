@@ -1,6 +1,7 @@
 import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
 import { normalizePreferences } from '../notices.ts';
 import { buildSummary, fallbackText } from '../summary.ts';
+import { projectBalance } from '../forecast.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -27,6 +28,7 @@ export function createDemoService(): FinanceService {
   const goals = new Map<string, number>([[month, 90000], [shiftMonth(month, -1), 90000]]);
   /** Months whose summary card was dismissed. */
   const dismissedSummaries = new Set<string>();
+  const demoBankBalance = 82000;
   const budgets = new Map<string, number>([[month, 200000]]);
   /** Category limits (same every month), by category name. */
   const categoryBudgets = new Map<string, number>([['Alimentação', 60000], ['Assinaturas', 20000]]);
@@ -210,6 +212,10 @@ export function createDemoService(): FinanceService {
         accounts: [...accounts], cards: [...cards], investments: [...investments], recurrences: [...recurrences],
         invoices: monthInvoices, coverage: coverage.filter((item) => item.month === period),
         summary: dismissedSummaries.has(lastMonth()) ? null : summaryOf(lastMonth()),
+        // As if Open Finance had brought the account balance (R$ 820,00): the month's bills make it negative near the end.
+        forecast: period === currentMonth()
+          ? projectBalance({ today: todayInSaoPaulo(), entries: all, invoices: monthInvoices, bankBalance: demoBankBalance })
+          : null,
         categoryBudgets: [...categoryBudgets].map(([category, amount]) => ({ category, amount }))
           .sort((a, b) => a.category.localeCompare(b.category, 'pt-BR')),
       };

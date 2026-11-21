@@ -7,7 +7,7 @@ import { chargeDate } from './recurring.ts';
  * shared by the Worker (which sends them from the cron) and the tests; no I/O here.
  */
 
-export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget' | 'monthly_summary';
+export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget' | 'monthly_summary' | 'negative_balance';
 
 export const defaultPreferences: PushPreferences = {
   billDue: true,
@@ -16,6 +16,7 @@ export const defaultPreferences: PushPreferences = {
   largeExpenseMin: 50000,
   budget: true,
   monthlySummary: true,
+  negativeBalance: true,
 };
 
 /** Fills what a stored (or older) preferences object lacks; ignores anything unexpected. */
@@ -31,6 +32,7 @@ export function normalizePreferences(value: unknown): PushPreferences {
     largeExpenseMin: min >= 100 && min <= 100_000_000 ? min : defaultPreferences.largeExpenseMin,
     budget: flag('budget'),
     monthlySummary: flag('monthlySummary'),
+    negativeBalance: flag('negativeBalance'),
   };
 }
 
@@ -41,6 +43,7 @@ export const preferenceOf: Record<NoticeKind, keyof PushPreferences> = {
   large_expense: 'largeExpense',
   budget: 'budget',
   monthly_summary: 'monthlySummary',
+  negative_balance: 'negativeBalance',
 };
 
 /** Hours (São Paulo) each kind may be sent; outside them it waits for the next run. */
@@ -50,6 +53,7 @@ const sendingHours: Record<NoticeKind, [number, number]> = {
   large_expense: [7, 22],
   budget: [8, 22],
   monthly_summary: [9, 21],
+  negative_balance: [9, 21],
 };
 export const dueKinds = (hour: number) =>
   (Object.keys(sendingHours) as NoticeKind[]).filter((kind) => hour >= sendingHours[kind][0] && hour <= sendingHours[kind][1]);
@@ -233,6 +237,15 @@ export function composeNotices(items: NoticeItem[]): Notice[] {
       kind: 'monthly_summary', refs: summaries.map(({ ref }) => ref), tag: 'resumo-mensal', url: screenUrl('home'),
       title: `Seu resumo de ${latest.label} chegou`,
       body: 'Veja entradas, saídas, o que mais cresceu e se a meta foi batida.',
+    });
+  }
+  const negative = byKind('negative_balance');
+  if (negative.length) {
+    const [first] = negative;
+    notices.push({
+      kind: 'negative_balance', refs: negative.map(({ ref }) => ref), tag: 'saldo-negativo', url: screenUrl('home'),
+      title: 'Seu saldo pode ficar negativo',
+      body: `Pela previsão, o saldo fica abaixo de zero no dia ${Number(first.date!.slice(8, 10))} e chega a ${money(-first.amount)}. Veja o que vence até lá.`,
     });
   }
   return notices;

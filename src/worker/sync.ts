@@ -106,6 +106,12 @@ export async function syncItem(
       fail(card.error);
       closingDay = card.data!.closing_day;
       dueDay = card.data!.due_day;
+    } else {
+      // Bank balance today: the start of the balance forecast (src/forecast.ts).
+      const saved = await db.from("pluggy_accounts")
+        .update({ balance_cents: cents(account.balance), balance_synced_at: new Date().toISOString() })
+        .eq("pluggy_account_id", account.id).eq("user_id", userId);
+      if (saved.error) console.error("bank balance", account.id, saved.error.message);
     }
     const transactions = await pluggy.transactions(account.id, { dateFrom });
     if (!transactions.length) continue;

@@ -1,4 +1,4 @@
-import type { Account, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -376,8 +376,29 @@ export function createDemoService(): FinanceService {
       profile.avatarUrl = avatar ? URL.createObjectURL(avatar) : undefined;
     },
     async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
+    assistant: demoAssistant,
   };
 }
+
+/** No AI in the demo: answers with the key lines the app computed, typed out like the real chat. */
+const demoAssistant: Assistant = {
+  async ask(question, context, _history, onText) {
+    // Only the simulation part when there is one, so summary lines don't repeat.
+    const simulation = context.indexOf('SIMULAÇÃO');
+    const key = (simulation >= 0 ? context.slice(simulation) : context)
+      .split('\n')
+      .filter((line) => /^(Compra:|Mês mais apertado|Meses que ficam|Nenhum mês|Meta mensal|Sobra média|Meta "|Limite disponível|Recebido no mês)/.test(line));
+    const answer = [
+      'Na demonstração o assistente não usa a IA; na sua conta, ela explica estes números em linguagem natural.',
+      ...(key.length ? key.map((line) => `• ${line}`) : [`Sua pergunta foi: "${question}".`]),
+    ].join('\n');
+    for (const word of answer.split(/(?<= )/)) {
+      onText(word);
+      await new Promise((resolve) => setTimeout(resolve, 12));
+    }
+    return answer;
+  },
+};
 
 function isExpense(entry: Entry) {
   return entry.kind === 'expense' || entry.kind === 'refund';

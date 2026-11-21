@@ -4,6 +4,7 @@ import { invoiceDates, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import type {
+  Assistant,
   BankConnections,
   FinanceService,
   Entry,
@@ -124,9 +125,35 @@ export function createSupabaseService(
     },
     remove: (itemId) => api<void>(`items/${encodeURIComponent(itemId)}`, "DELETE"),
   };
+  /** Streams the Worker's /api/chat answer (plain text) into `onText`. */
+  const assistant: Assistant = {
+    async ask(question, context, history, onText) {
+      const { data } = await db.auth.getSession();
+      if (!data.session) throw new Error("Sessão encerrada");
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { authorization: `Bearer ${data.session.access_token}`, "content-type": "application/json" },
+        body: JSON.stringify({ question, context, history }),
+      });
+      if (!response.ok || !response.body) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "O assistente não respondeu. Tente de novo.");
+      }
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let answer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        answer += value;
+        onText(value);
+      }
+      return answer;
+    },
+  };
   return {
     session,
     bankConnections,
+    assistant,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),

@@ -9,6 +9,7 @@ import { Avatar, BackNavigation, Icon, MonthControl, PageHeading } from "./compo
 import { MobileNav, Sidebar } from "./components/Navigation";
 import OpenFinance from "./pages/OpenFinance";
 import Activity, { type ActivityFilter } from "./pages/Activity";
+import Assistant from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
 import Cards from "./pages/Cards";
 import Commitments from "./pages/Commitments";
@@ -225,6 +226,7 @@ export default function FinanceApp({
     commitments: <Commitments data={data} monthControl={monthControl} setModal={openEditor} />,
     investments: <Investments data={data} setModal={openEditor} />,
     goals: <Goals data={data} openEditor={openEditor} />,
+    assistant: <Assistant data={data} assistant={commands.assistant} />,
     import: (
       <>
         <PageHeading

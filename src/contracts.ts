@@ -168,6 +168,17 @@ export interface FinanceService {
   changePassword(current: string, next: string): Promise<void>;
   /** Open Finance through Pluggy; only with a real account (absent in the demo). */
   bankConnections?: BankConnections;
+  /** Financial assistant (Workers AI); the demo answers locally. */
+  assistant?: Assistant;
+}
+
+export interface AssistantTurn { role: 'user' | 'assistant'; content: string }
+export interface Assistant {
+  /**
+   * Asks about the account. `context` carries the numbers the app computed (summary and
+   * simulation); `onText` receives the answer as it arrives. Resolves with the whole answer.
+   */
+  ask(question: string, context: string, history: AssistantTurn[], onText: (text: string) => void): Promise<string>;
 }
 
 export interface BankConnection { itemId: string; bank: string; status: string | null; lastSyncedAt: string | null }

@@ -11,6 +11,7 @@ export type Page =
   | "import"
   | "connections"
   | "profile"
+  | "assistant"
   | "more";
 export type EditModal =
   | { type: "entry"; item?: Entry; kind?: EntryKind }
@@ -31,5 +32,5 @@ export type OpenEditor = (modal: EditModal) => void;
 
 export type FinanceCommands = Pick<
   FinanceService,
-  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections"
+  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "assistant"
 > & { refresh: () => Promise<void> };

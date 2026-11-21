@@ -7,6 +7,7 @@ const shortcuts: Partial<Record<Page, { detail: string; tone: string }>> = {
   cards: { detail: "Bancos e vencimentos", tone: "teal" },
   commitments: { detail: "Contas e parcelas", tone: "peach" },
   investments: { detail: "Carteira e evolução", tone: "blue" },
+  assistant: { detail: "Simular compras e tirar dúvidas", tone: "violet" },
 };
 
 export default function More({

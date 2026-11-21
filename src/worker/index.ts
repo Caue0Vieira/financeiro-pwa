@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import manifestSource from "../../public/manifest.webmanifest?raw";
+import { answer, ChatInputError, quotaExceeded } from "./assistant";
 import { categorizeEveryone, categorizePending, type Ai } from "./categorize";
 import { manifestFor } from "./manifest";
 import { mapTransaction, purchasesAreNegative } from "./mapping";
@@ -253,6 +254,24 @@ function servicesFor(env: Env): Services {
   };
 }
 
+/** Assistant question: checks the session and streams the Workers AI answer as plain text. */
+async function chat(env: Env, request: Request) {
+  if (request.method !== "POST") return json({ error: "not found" }, 404);
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.AI) {
+    return json({ error: "Assistente ainda não configurado no servidor." }, 503);
+  }
+  try {
+    await signedInUser(servicesFor(env), request);
+    return await answer(env.AI, await body(request));
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    if (error instanceof ChatInputError) return json({ error: error.message }, 400);
+    if (quotaExceeded(error)) return json({ error: "O assistente atingiu o limite de hoje. Volta amanhã; a simulação continua funcionando." }, 429);
+    console.error("/api/chat", error);
+    return json({ error: "O assistente não respondeu. Tente de novo." }, 502);
+  }
+}
+
 const configured = (env: Env) =>
   Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
 
@@ -274,6 +293,8 @@ export default {
         },
       });
     }
+    // The assistant needs only Supabase (to check the session) and Workers AI, not Pluggy.
+    if (pathname === "/api/chat") return await chat(env, request);
     if (!configured(env)) {
       return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
     }

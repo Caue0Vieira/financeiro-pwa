@@ -58,6 +58,8 @@ export interface Recurrence {
   endMonth?: string;
   /** Card the charge goes on; each month's charge then joins that card's invoice. Expenses only. */
   cardId?: string;
+  /** Recorded as received/paid on its day, without confirming by hand (salary, automatic debit). Not for card charges. */
+  autoRecord?: boolean;
 }
 export interface Invoice {
   cardId: string;

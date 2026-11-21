@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { invoiceDates, invoiceMonthOf, shiftMonth } from './date.ts';
-import { chargesInInvoice } from './recurring.ts';
+import { autoRecordDate, chargesInInvoice } from './recurring.ts';
 import { createDemoService } from './backend/demo.ts';
 import { currentMonth } from './date.ts';
 
@@ -79,4 +79,29 @@ test('demo card subscriptions follow the closing day and move to the account whe
   const after = await service.dashboard(month);
   assert.ok(after.recurrences.every(({ cardId }) => !cardId));
   assert.equal(after.upcoming.find(({ description }) => description === 'Jornal')?.cardId, undefined);
+});
+
+test('"lançar sozinho" records the charge once its day comes, in the current month only', () => {
+  const rule = { startMonth: '2026-01', day: 5, autoRecord: true };
+  assert.equal(autoRecordDate(rule, '2026-11', '2026-11-21'), '2026-11-05');
+  assert.equal(autoRecordDate(rule, '2026-11', '2026-11-04'), null);
+  assert.equal(autoRecordDate(rule, '2026-10', '2026-11-21'), null);
+  assert.equal(autoRecordDate({ ...rule, autoRecord: false }, '2026-11', '2026-11-21'), null);
+  assert.equal(autoRecordDate({ ...rule, cardId: 'cartao' }, '2026-11', '2026-11-21'), null);
+});
+
+test('demo salary marked "lançar sozinho" becomes a confirmed entry once', async () => {
+  const service = createDemoService();
+  const month = currentMonth();
+  const recurrence = { description: 'Salário fixo', amount: 500000, kind: 'income', category: 'Salário', startMonth: month, day: 1 };
+  await service.mutate({ type: 'saveRecurrence', recurrence });
+  const before = await service.dashboard(month);
+  const rule = before.recurrences.find(({ description }) => description === 'Salário fixo');
+  assert.ok(before.upcoming.some(({ recurrenceId }) => recurrenceId === rule.id));
+  await service.mutate({ type: 'saveRecurrence', recurrence: { ...rule, autoRecord: true }, effectiveMonth: shiftMonth(month, 1) });
+  const after = await service.dashboard(month);
+  assert.equal(after.recurrences.filter(({ description }) => description === 'Salário fixo').length, 1);
+  assert.ok(!after.upcoming.some(({ recurrenceId }) => recurrenceId === rule.id));
+  assert.equal(after.received, before.received + 500000);
+  assert.equal((await service.dashboard(month)).received, after.received);
 });

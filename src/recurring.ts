@@ -27,3 +27,13 @@ export function chargesInInvoice(rule: ChargeRule, card: CardDays | undefined, m
   }
   return dates;
 }
+
+/**
+ * Date to record a rule marked "lançar sozinho" in `month`: only in the current month, once its day
+ * has come, and not for card charges (those already join the invoice). Null when nothing is due.
+ */
+export function autoRecordDate(rule: ChargeRule & { autoRecord?: boolean; cardId?: string }, month: string, today: string) {
+  if (!rule.autoRecord || rule.cardId || month !== today.slice(0, 7)) return null;
+  const date = chargeDate(rule, month);
+  return date && date <= today ? date : null;
+}

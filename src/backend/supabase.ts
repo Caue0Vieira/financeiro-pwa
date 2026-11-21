@@ -4,7 +4,7 @@ import { prepareReceipt } from "./receiptFile";
 import { filterText, normalizeTags, tagTotals } from "../search";
 import { addDays, currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
-import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
+import { autoRecordDate, chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import { normalizePreferences } from "../notices";
 import { summaryFrom } from "../summary";
 import { projectBalance } from "../forecast";
@@ -714,6 +714,29 @@ export function createSupabaseService(
         // Charged on a card: billed in the invoice its date falls into, by the card's closing day.
         ...(r.card_id ? { cardId: r.card_id, invoiceMonth: chargeInvoiceMonth(date, cardDays.get(r.card_id)) } : {}),
       });
+      // Rules marked "lançar sozinho" whose day has come are recorded now as confirmed. A charge
+      // recorded meanwhile (another device) hits the unique index per rule and month: skip it.
+      const today = todayInSaoPaulo();
+      const autoRows = await Promise.all(rules.map(async (r: any) => {
+        const date = autoRecordDate(
+          { startMonth: r.starts_on, endMonth: r.ends_on ?? undefined, day: r.day_of_month, autoRecord: r.auto_record, cardId: r.card_id ?? undefined },
+          period, today,
+        );
+        if (!date || recorded.has(`${r.id}:${period}`)) return null;
+        const { data: row, error: insertError } = await db.from("transactions").insert({
+          occurred_on: date, description: r.description, amount_cents: r.amount_cents, kind: r.kind,
+          category: r.category, status: "confirmed", source: "recurring", recurring_rule_id: r.id,
+          account_id: r.account_id ?? null,
+        }).select().single();
+        if (insertError && insertError.code !== "23505") console.error("auto record", insertError);
+        return row ?? null;
+      }));
+      for (const row of autoRows) {
+        if (!row) continue;
+        entries.push(entry(row));
+        recorded.add(`${row.recurring_rule_id}:${period}`);
+      }
+      if (autoRows.some(Boolean)) entries.sort((a, b) => b.date.localeCompare(a.date));
       // Card charges from earlier months (after their closing day) that are billed in this month's invoice.
       const earlierCardCharges: Entry[] = [];
       for (const r of rules) {
@@ -885,6 +908,7 @@ export function createSupabaseService(
           day: r.day_of_month,
           endMonth: r.ends_on?.slice(0, 7),
           cardId: r.card_id ?? undefined,
+          autoRecord: r.auto_record === true,
         })),
         invoices: invoiceList,
         // Until the push_notifications migration is applied there are no category limits.

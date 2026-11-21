@@ -251,6 +251,7 @@ export default function Editor({
       });
     else if (type === "recurrence") {
       const k = read(f, "kind") as "income" | "expense";
+      const cardId = (k === "expense" && read(f, "payWith")) || undefined;
       void mutate({
         type: "saveRecurrence",
         recurrence: {
@@ -262,7 +263,9 @@ export default function Editor({
           startMonth: read(f, "startMonth") || item?.startMonth || month,
           day: Number(read(f, "day")),
           endMonth: read(f, "endMonth") || undefined,
-          cardId: (k === "expense" && read(f, "payWith")) || undefined,
+          cardId,
+          // Card charges already join the invoice; the option applies to the account only.
+          autoRecord: f.get("autoRecord") === "on" && !cardId,
         },
         effectiveMonth: read(f, "effectiveMonth") || undefined,
       });
@@ -695,6 +698,22 @@ export default function Editor({
                 full
               />
               {recurrenceCards.length > 0 && <PayWithField cards={recurrenceCards} defaultValue={item?.cardId} />}
+              <label className="switch-row full">
+                <span>
+                  <strong>Lançar sozinho no dia</strong>
+                  <small>
+                    Entra como recebido (ou pago) no dia do mês, sem precisar confirmar. Bom para salário e débito
+                    automático. Se o banco já traz esse valor pelo Open Finance, deixe desligado para não duplicar.
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="switch"
+                  name="autoRecord"
+                  defaultChecked={item?.autoRecord === true}
+                />
+              </label>
               <details className="form-details full">
                 <summary>Categoria e período</summary>
                 <div className="form-grid">

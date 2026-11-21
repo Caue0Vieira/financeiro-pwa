@@ -7,7 +7,7 @@ import { prepareReceipt } from './receiptFile.ts';
 import { matchesSearch, normalizeTags, tagTotals } from '../search.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
-import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
+import { autoRecordDate, chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
 
 export function createDemoService(): FinanceService {
   const month = currentMonth();
@@ -129,6 +129,19 @@ export function createDemoService(): FinanceService {
       : {}),
   });
 
+  /** Rules marked "lançar sozinho" whose day has come this month become confirmed entries. */
+  function recordDue(period: string) {
+    const today = todayInSaoPaulo();
+    for (const rule of recurrences) {
+      const date = autoRecordDate(rule, period, today);
+      if (!date || recorded(rule.id, period)) continue;
+      entries.push({
+        id: crypto.randomUUID(), date, description: rule.description, amount: rule.amount, kind: rule.kind,
+        category: rule.category, status: 'confirmed', source: 'recurrence', recurrenceId: rule.id, accountId: 'conta',
+      });
+    }
+  }
+
   function items(period: string) {
     const result = entries.filter((entry) => (entry.invoiceMonth ?? entry.date.slice(0, 7)) === period);
     for (const rule of recurrences) {
@@ -195,6 +208,7 @@ export function createDemoService(): FinanceService {
       if (profile.avatarUrl) URL.revokeObjectURL(profile.avatarUrl);
     },
     async dashboard(period): Promise<Dashboard> {
+      recordDue(period);
       const { all, confirmed, income, expenses } = monthly(period);
       const cash = confirmed.filter((entry) => !entry.cardId);
       const upcoming = all.filter((entry) => entry.status === 'planned').sort((a, b) => a.date.localeCompare(b.date));
@@ -337,7 +351,12 @@ export function createDemoService(): FinanceService {
           return;
         case 'saveRecurrence': {
           const previous = recurrences.find((item) => item.id === action.recurrence.id);
-          if (previous && action.effectiveMonth && action.effectiveMonth > previous.startMonth) {
+          // Turning "lançar sozinho" on or off alone changes no amount or date: no split by month.
+          const sameCharge = previous && (['description', 'amount', 'kind', 'category', 'day', 'endMonth', 'cardId'] as const)
+            .every((key) => previous[key] === action.recurrence[key]);
+          if (previous && sameCharge) {
+            previous.autoRecord = !previous.cardId && action.recurrence.autoRecord === true;
+          } else if (previous && action.effectiveMonth && action.effectiveMonth > previous.startMonth) {
             previous.endMonth = shiftMonth(action.effectiveMonth, -1);
             put(recurrences, { ...action.recurrence, id: crypto.randomUUID(), startMonth: action.effectiveMonth });
           } else {

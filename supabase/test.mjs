@@ -106,6 +106,15 @@ const laterRule=(await db.query("select id from public.recurring_rules where des
 await db.query("select public.save_recurrence($1::jsonb,'2026-03-01')",[JSON.stringify({...subscription,id:laterRule,startMonth:'2026-03-01',cardId:null})]);
 assert.equal((await db.query('select card_id from public.recurring_rules where id=$1',[laterRule])).rows[0].card_id,null);
 await assert.rejects(db.query('select public.save_recurrence($1::jsonb,null)',[JSON.stringify({...recurrence,cardId:card})]),/Income cannot be charged on a card/);
+// Turning on "lançar sozinho" alone keeps the rule (no split by month); card charges never take it.
+const salaryRule=(await db.query("select id,starts_on from public.recurring_rules where description='Salário' and ends_on is null")).rows[0];
+const salaryNow={...recurrence,amount:550000,startMonth:'2026-02-01',id:salaryRule.id,autoRecord:true};
+assert.equal((await db.query("select public.save_recurrence($1::jsonb,'2026-06-01') as id",[JSON.stringify(salaryNow)])).rows[0].id,salaryRule.id);
+assert.equal((await db.query('select auto_record from public.recurring_rules where id=$1',[salaryRule.id])).rows[0].auto_record,true);
+assert.equal((await db.query("select count(*)::int as n from public.recurring_rules where description='Salário'")).rows[0].n,2);
+const cardAuto=(await db.query('select public.save_recurrence($1::jsonb,null) as id',[JSON.stringify({...subscription,description:'Revista',autoRecord:true})])).rows[0].id;
+assert.equal((await db.query('select auto_record from public.recurring_rules where id=$1',[cardAuto])).rows[0].auto_record,false);
+await db.query('delete from public.recurring_rules where id=$1',[cardAuto]);
 const sameId={...payload,fileHash:'b'.repeat(64)};
 const duplicate=(await db.query('select public.import_transactions($1::jsonb) as result',[JSON.stringify(sameId)])).rows[0].result;
 assert.equal(duplicate.skipped,1);

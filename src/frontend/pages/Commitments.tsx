@@ -411,6 +411,7 @@ function RecurringRow({
   const detail = [
     rule.cardId && (cardName ? cardLabel(cardName) : "Cartão excluído"),
     status,
+    pending && rule.autoRecord && "lança sozinho",
     laterInvoice && `fatura de ${monthOnly(laterInvoice)}`,
     rule.endMonth && `até ${shortMonth(rule.endMonth)}`,
   ].filter(Boolean).join(" · ");

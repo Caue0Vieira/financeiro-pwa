@@ -134,6 +134,7 @@ export default function App() {
     analysis: service.analysis,
     bankConnections: service.bankConnections,
     assistant: service.assistant,
+    push: service.push,
     refresh,
   };
   return (

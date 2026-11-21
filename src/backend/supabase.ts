@@ -3,6 +3,7 @@ import { encodeAvatar } from "./avatar";
 import { invoiceDates, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
+import { normalizePreferences } from "../notices";
 import type {
   Assistant,
   BankConnections,
@@ -10,6 +11,7 @@ import type {
   Entry,
   Dashboard,
   Action,
+  PushNotifications,
   Session,
   SavingsTarget,
   Valuation,
@@ -150,10 +152,37 @@ export function createSupabaseService(
       return answer;
     },
   };
+  /** Each device writes its own subscription (RLS); the Worker sends from the cron. */
+  const push: PushNotifications = {
+    async publicKey() {
+      const response = await fetch("/api/push/key").catch(() => null);
+      if (!response?.ok) return null;
+      const { publicKey } = await response.json().catch(() => ({}));
+      return typeof publicKey === "string" && publicKey ? publicKey : null;
+    },
+    async preferences(endpoint) {
+      const { data, error } = await db.from("push_subscriptions").select("preferences").eq("endpoint", endpoint).maybeSingle();
+      fail(error);
+      return data ? normalizePreferences(data.preferences) : null;
+    },
+    async save({ endpoint, p256dh, auth }, preferences) {
+      const { error } = await db.from("push_subscriptions").upsert(
+        { endpoint, p256dh, auth, preferences, user_agent: navigator.userAgent.slice(0, 300) },
+        { onConflict: "endpoint" },
+      );
+      fail(error);
+    },
+    async remove(endpoint) {
+      const { error } = await db.from("push_subscriptions").delete().eq("endpoint", endpoint);
+      fail(error);
+    },
+    test: (endpoint) => api<void>("/api/push/test", "POST", { endpoint }),
+  };
   return {
     session,
     bankConnections,
     assistant,
+    push,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),
@@ -407,6 +436,21 @@ export function createSupabaseService(
           fail(error);
           break;
         }
+        case "saveCategoryBudget": {
+          const category = action.category.trim();
+          if (action.amount > 0) {
+            const u = await user();
+            const { error } = await db.from("category_budgets").upsert(
+              { user_id: u.id, category, amount_cents: action.amount },
+              { onConflict: "user_id,category" },
+            );
+            fail(error);
+          } else {
+            const { error } = await db.from("category_budgets").delete().eq("category", category);
+            fail(error);
+          }
+          break;
+        }
         case "settleInvoice": {
           const { error } = await db.rpc("settle_invoice", {
             p_payment_id: action.paymentId,
@@ -429,10 +473,11 @@ export function createSupabaseService(
       return summarizeSpending(rows, window, period);
     },
     async dashboard(month): Promise<Dashboard> {
-      const [{ data, error }, planning, adjustedDates] = await Promise.all([
+      const [{ data, error }, planning, adjustedDates, categoryLimits] = await Promise.all([
         db.rpc("monthly_dashboard", { p_month: first(month) }),
         db.rpc("nitido_planning", { p_month: first(month) }),
         db.from("card_invoice_dates").select("card_id, closing_on, due_on").eq("month", first(month)),
+        db.from("category_budgets").select("category, amount_cents").order("category"),
       ]);
       fail(error);
       fail(planning.error);
@@ -657,6 +702,10 @@ export function createSupabaseService(
           cardId: r.card_id ?? undefined,
         })),
         invoices: invoiceList,
+        // Until the push_notifications migration is applied there are no category limits.
+        categoryBudgets: (categoryLimits.error ? [] : categoryLimits.data ?? []).map((x) => ({
+          category: x.category, amount: Number(x.amount_cents),
+        })),
         coverage: batches
           .filter((x) => x.coverage_start && x.coverage_end)
           .map((x) => ({ month, from: x.coverage_start, to: x.coverage_end })),

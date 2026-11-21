@@ -47,6 +47,16 @@ const toastVisibleMs = 1500;
 /** Pages of the phone tab bar, in order, for swiping between them. */
 const swipeTabs: Page[] = ["home", "analytics", "goals", "profile"];
 const toastExitMs = 180;
+/** Screens a link can open (`/?abrir=commitments`): push notifications and the manifest shortcuts. */
+const linkPages: Page[] = ["home", "activity", "analytics", "commitments", "cards", "goals", "investments", "assistant", "profile"];
+export function pageFromLink(href: string): Page | undefined {
+  try {
+    const page = new URL(href, window.location.origin).searchParams.get("abrir") as Page | null;
+    return page && linkPages.includes(page) ? page : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export default function FinanceApp({
   data,
@@ -58,7 +68,7 @@ export default function FinanceApp({
   email,
   onSignOut,
 }: Props) {
-  const [page, setPage] = useState<Page>("home");
+  const [page, setPage] = useState<Page>(() => pageFromLink(window.location.href) ?? "home");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [activityMonth, setActivityMonth] = useState(data.month);
   const [commitmentView, setCommitmentView] = useState<CommitmentView>("fixed");
@@ -94,6 +104,25 @@ export default function FinanceApp({
       return true;
     },
   });
+
+  // A link opened the app on a screen: drop the parameter so a reload starts at home.
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, []);
+
+  // A tapped notification while the app is open: the service worker asks for the screen.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  useEffect(() => {
+    const worker = navigator.serviceWorker;
+    if (!worker) return;
+    const onMessage = (event: MessageEvent) => {
+      const target = event.data?.type === "open" && typeof event.data.url === "string" ? pageFromLink(event.data.url) : undefined;
+      if (target) navigateRef.current(target);
+    };
+    worker.addEventListener("message", onMessage);
+    return () => worker.removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     if (!moveFocus.current) return;

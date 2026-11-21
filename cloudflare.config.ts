@@ -10,8 +10,9 @@ export default defineConfig({
     workersDev: true,
     previewUrls: false,
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*', '/manifest.webmanifest'] },
-    // Backup for the Pluggy webhook: each hour imports what Pluggy has for the connection synced
-    // longest ago (one per run, for the free plan's subrequest limit), then runs Workers AI.
+    // Hourly: even hours (São Paulo) are the Pluggy webhook backup (imports the connection synced
+    // longest ago, then runs Workers AI); odd hours send the push notices. They take turns because
+    // of the free plan's subrequest limit per invocation (src/worker/index.ts → scheduledWork).
     triggers: [triggers.scheduled({ schedule: '0 * * * *' })],
     // Values are set in Cloudflare, never committed: see README → "Open Finance (Pluggy)".
     env: {
@@ -20,6 +21,9 @@ export default defineConfig({
       PLUGGY_CLIENT_ID: bindings.secret(),
       PLUGGY_CLIENT_SECRET: bindings.secret(),
       PLUGGY_WEBHOOK_SECRET: bindings.secret(),
+      // Web Push (VAPID): see README → "Notificações push".
+      VAPID_PUBLIC_KEY: bindings.secret(),
+      VAPID_PRIVATE_KEY: bindings.secret(),
       // Workers AI: categorises what no learned rule covers (src/worker/categorize.ts).
       AI: bindings.ai(),
     },

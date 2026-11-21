@@ -109,7 +109,11 @@ export interface Dashboard {
   recurrences: Recurrence[];
   invoices: Invoice[];
   coverage: Coverage[];
+  /** Spending limit per category (same every month); notices at 80% and 100%. */
+  categoryBudgets: CategoryBudget[];
 }
+
+export interface CategoryBudget { category: string; amount: number }
 
 export type Action =
   | { type: 'saveEntry'; entry: Omit<Entry, 'id' | 'source'> & { id?: string } }
@@ -129,7 +133,9 @@ export type Action =
   | { type: 'contributeTarget'; id: string; amount: number }
   | { type: 'settleInvoice'; paymentId: string; cardId: string; month: string; amount: number }
   /** Both dates null restores the card's usual days for that month. */
-  | { type: 'saveInvoiceDates'; cardId: string; month: string; closingDate: string | null; dueDate: string | null };
+  | { type: 'saveInvoiceDates'; cardId: string; month: string; closingDate: string | null; dueDate: string | null }
+  /** Amount 0 removes the category's limit. */
+  | { type: 'saveCategoryBudget'; category: string; amount: number };
 
 export interface ImportRow {
   date: string;
@@ -170,6 +176,33 @@ export interface FinanceService {
   bankConnections?: BankConnections;
   /** Financial assistant (Workers AI); the demo answers locally. */
   assistant?: Assistant;
+  /** Web Push on this user's devices; the demo keeps the subscription in memory. */
+  push?: PushNotifications;
+}
+
+/** Which notices a device receives; defaults and parsing in src/notices.ts. */
+export interface PushPreferences {
+  /** Bill (not on a card) due tomorrow. */
+  billDue: boolean;
+  /** Card invoice closing in 2 days. */
+  invoiceClosing: boolean;
+  /** Expense from Open Finance at or above largeExpenseMin. */
+  largeExpense: boolean;
+  /** Cents. */
+  largeExpenseMin: number;
+  /** A category (or the month) passed 80% and 100% of its limit. */
+  budget: boolean;
+}
+export interface PushSubscriptionKeys { endpoint: string; p256dh: string; auth: string }
+export interface PushNotifications {
+  /** VAPID public key (base64url); null when the server can't send (demo or keys not set). */
+  publicKey(): Promise<string | null>;
+  /** Preferences saved for this device's endpoint, or null when it isn't subscribed. */
+  preferences(endpoint: string): Promise<PushPreferences | null>;
+  save(subscription: PushSubscriptionKeys, preferences: PushPreferences): Promise<void>;
+  remove(endpoint: string): Promise<void>;
+  /** Sends a test notification to this device. */
+  test(endpoint: string): Promise<void>;
 }
 
 export interface AssistantTurn { role: 'user' | 'assistant'; content: string }

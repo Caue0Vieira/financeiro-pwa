@@ -7,6 +7,7 @@ import { ProfilePhotoDialog } from "../components/ProfilePhotoDialog";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { AppIconPicker } from "../components/AppIconPicker";
 import { OpenFinanceGuide } from "../components/OpenFinanceGuide";
+import { PushSettings } from "../components/PushSettings";
 import type { FinanceCommands, Page } from "../types";
 import { dateLabel } from "../format";
 
@@ -211,6 +212,7 @@ export default function Profile({
               <AppIconPicker onChange={(label) => showNotice(`Ícone ${label} aplicado.`)} />
             </ProfileSection>
             <ProfileSection title="Notificações" icon="bell">
+              {commands.push && <PushSettings push={commands.push} preview={preview} showNotice={showNotice} />}
               {invoiceReminders}
               <p className="subtle">Próximos vencimentos neste mês</p>
               {data.upcoming.length ? (

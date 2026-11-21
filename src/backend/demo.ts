@@ -1,4 +1,5 @@
-import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import { normalizePreferences } from '../notices.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -24,6 +25,8 @@ export function createDemoService(): FinanceService {
   const profile: Profile = { name: 'Ayesha Khan' };
   const goals = new Map<string, number>([[month, 90000]]);
   const budgets = new Map<string, number>([[month, 200000]]);
+  /** Category limits (same every month), by category name. */
+  const categoryBudgets = new Map<string, number>([['Alimentação', 60000], ['Assinaturas', 20000]]);
   const targets: SavingsTarget[] = [
     { id: 'emergencia', name: 'Reserva de emergência', amount: 300000, saved: 120000 },
     { id: 'ferias', name: 'Viagem de férias', amount: 250000, saved: 85000 },
@@ -183,6 +186,8 @@ export function createDemoService(): FinanceService {
         categories: Array.from(categoryTotals, ([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
         accounts: [...accounts], cards: [...cards], investments: [...investments], recurrences: [...recurrences],
         invoices: monthInvoices, coverage: coverage.filter((item) => item.month === period),
+        categoryBudgets: [...categoryBudgets].map(([category, amount]) => ({ category, amount }))
+          .sort((a, b) => a.category.localeCompare(b.category, 'pt-BR')),
       };
     },
     async analysis(date, period) {
@@ -316,6 +321,13 @@ export function createDemoService(): FinanceService {
           else invoiceDateOverrides.set(key, { closingDate: action.closingDate, dueDate: action.dueDate });
           return;
         }
+        case 'saveCategoryBudget': {
+          const category = action.category.trim();
+          if (!category) throw new Error('Escolha uma categoria.');
+          if (action.amount > 0) categoryBudgets.set(category, action.amount);
+          else categoryBudgets.delete(category);
+          return;
+        }
         case 'settleInvoice': {
           const payment = entries.find((entry) => entry.id === action.paymentId && entry.kind === 'card_payment');
           const invoice = invoices(action.month).find((item) => item.cardId === action.cardId);
@@ -377,6 +389,38 @@ export function createDemoService(): FinanceService {
     },
     async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
     assistant: demoAssistant,
+    push: demoPush(),
+  };
+}
+
+/**
+ * The demo has no server to send pushes: it remembers the choices while the page is open and the
+ * test notification is shown by the device itself.
+ */
+function demoPush(): PushNotifications {
+  const devices = new Map<string, PushPreferences>();
+  return {
+    async publicKey() { return null; },
+    async preferences(endpoint) { return devices.get(endpoint) ?? null; },
+    async save({ endpoint }, preferences) { devices.set(endpoint, normalizePreferences(preferences)); },
+    async remove(endpoint) { devices.delete(endpoint); },
+    async test() {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+        throw new Error('Permita as notificações no navegador para ver o teste.');
+      }
+      const title = 'Notificações ativadas';
+      const options = {
+        body: 'Na demonstração o aviso sai do próprio aparelho; na sua conta, ele vem do servidor.',
+        icon: '/icons/icon-192.png', tag: 'teste', data: { url: '/?abrir=profile' },
+      };
+      const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+      try {
+        if (registration) await registration.showNotification(title, options);
+        else new Notification(title, options);
+      } catch {
+        throw new Error('Este navegador só mostra notificações com o app instalado.');
+      }
+    },
   };
 }
 

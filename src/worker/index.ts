@@ -6,6 +6,9 @@ import { manifestFor } from "./manifest";
 import { mapTransaction, purchasesAreNegative } from "./mapping";
 import { PluggyError, pluggyClient, tokenHeader, validSignature, validToken, type Pluggy } from "./pluggy";
 import { deleteTransactions, syncItem } from "./sync";
+import { pruneLog, runNotices, saoPauloClock, SubrequestBudget } from "./notifications";
+import { knownPushService } from "../notices";
+import { sendPush, type VapidKeys } from "./webpush";
 
 /**
  * Server side of the Pluggy (Open Finance) integration. Runs only for /api/* (see
@@ -20,7 +23,13 @@ export type Env = {
   PLUGGY_WEBHOOK_SECRET: string;
   /** Workers AI: classifies what no learned rule or merchant pattern covered. */
   AI?: Ai;
+  /** Web Push (VAPID): raw P-256 public point and private scalar, base64url. See README. */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
 };
+
+/** VAPID "sub": how a push service reaches whoever sends (Apple requires https: or mailto:). */
+const appUrl = "https://financeiro-pwa.cauevieira-dev07.workers.dev";
 type Context = { waitUntil(promise: Promise<unknown>): void };
 type Services = { env: Env; db: SupabaseClient; pluggy: Pluggy };
 
@@ -47,7 +56,7 @@ class HttpError extends Error {
   }
 }
 
-async function signedInUser({ db }: Services, request: Request) {
+async function signedInUser({ db }: Pick<Services, "db">, request: Request) {
   const token = request.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
   if (!token) throw new HttpError(401, "Entre na sua conta para continuar.");
   const { data, error } = await db.auth.getUser(token);
@@ -217,6 +226,7 @@ async function webhook(services: Services, request: Request, context: Context) {
       case "transactions/created":
         await syncItem(services.db, services.pluggy, userId, event.itemId!);
         await autoCategorize(services, userId);
+        await notifyLargeExpenses(services.env, userId);
         break;
     }
     await services.db.from("pluggy_events").delete().lt("received_at", new Date(Date.now() - 30 * 86_400_000).toISOString());
@@ -244,14 +254,101 @@ async function syncStalestItem(services: Services) {
   }
 }
 
+/** Service-role client; `fetcher` lets a caller count its subrequests. */
+const database = (env: Env, fetcher?: typeof fetch) =>
+  createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(fetcher && { global: { fetch: fetcher } }),
+  });
+
 function servicesFor(env: Env): Services {
   return {
     env,
-    db: createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    }),
+    db: database(env),
     pluggy: pluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET),
   };
+}
+
+const vapidKeys = (env: Env): VapidKeys | null =>
+  env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY
+    ? { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: appUrl }
+    : null;
+const pushConfigured = (env: Env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && vapidKeys(env));
+
+/**
+ * Right after a webhook import: tells the user about large purchases at once instead of waiting
+ * for the cron. Few subrequests, since the sync already spent most of this invocation's.
+ */
+async function notifyLargeExpenses(env: Env, userId: string) {
+  const keys = vapidKeys(env);
+  if (!keys) return;
+  const budget = new SubrequestBudget(8);
+  await runNotices(database(env, budget.fetch), budget, keys, { userId, kinds: ["large_expense"] })
+    .catch((error) => console.error("push after webhook", userId, error));
+}
+
+/**
+ * Hourly cron. One invocation on the free plan has about 50 subrequests, not enough for a bank
+ * sync, the AI pass and the notices together, so they take turns: odd hours (São Paulo) send the
+ * notices, even hours sync Pluggy. With no device subscribed the notices cost one query and the
+ * sync runs too; without Pluggy configured the notices run every hour.
+ */
+async function scheduledWork(env: Env, now: Date) {
+  const pluggyReady = configured(env);
+  const keys = vapidKeys(env);
+  const { hour } = saoPauloClock(now);
+  if (keys && pushConfigured(env) && (hour % 2 === 1 || !pluggyReady)) {
+    const budget = new SubrequestBudget(45);
+    const db = database(env, budget.fetch);
+    const result = await runNotices(db, budget, keys, { now })
+      .catch((error) => {
+        console.error("scheduled push", error);
+        return { idle: false };
+      });
+    if (hour === 21 && !result.idle) await pruneLog(db, now);
+    if (!(pluggyReady && result.idle)) return;
+  }
+  if (pluggyReady) await syncStalestItem(servicesFor(env));
+}
+
+const pushUnavailable = () => json({ error: "Notificações ainda não configuradas no servidor." }, 503);
+
+/** GET /api/push/key: the VAPID public key the browser subscribes with (not a secret). */
+function pushKey(env: Env) {
+  const keys = vapidKeys(env);
+  return keys ? json({ publicKey: keys.publicKey }) : pushUnavailable();
+}
+
+/** POST /api/push/test: sends a sample notification to one of the user's own devices. */
+async function pushTest(env: Env, request: Request) {
+  const keys = vapidKeys(env);
+  if (!keys || !pushConfigured(env)) return pushUnavailable();
+  try {
+    const db = database(env);
+    const userId = await signedInUser({ db }, request);
+    const { endpoint } = await body(request);
+    if (typeof endpoint !== "string" || !knownPushService(endpoint)) throw new HttpError(400, "Aparelho inválido.");
+    const { data, error } = await db.from("push_subscriptions").select("endpoint, p256dh, auth")
+      .eq("user_id", userId).eq("endpoint", endpoint).maybeSingle();
+    if (error) throw error;
+    if (!data) throw new HttpError(404, "Ative as notificações neste aparelho primeiro.");
+    const result = await sendPush(data, {
+      title: "Notificações ativadas",
+      body: "É assim que os avisos do Nítido vão aparecer neste aparelho.",
+      url: "/?abrir=profile",
+      tag: "teste",
+    }, keys, fetch, 600);
+    if (result.gone) {
+      await db.from("push_subscriptions").delete().eq("user_id", userId).eq("endpoint", endpoint);
+      throw new HttpError(410, "Este aparelho cancelou a inscrição. Ative as notificações de novo.");
+    }
+    if (!result.ok) throw new HttpError(502, "O serviço de notificações recusou o envio. Tente de novo.");
+    return json({ ok: true });
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    console.error("/api/push/test", error);
+    return json({ error: "Não foi possível enviar o teste. Tente de novo." }, 502);
+  }
 }
 
 /** Assistant question: checks the session and streams the Workers AI answer as plain text. */
@@ -276,9 +373,9 @@ const configured = (env: Env) =>
   Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
 
 export default {
-  async scheduled(_controller: unknown, env: Env, context: Context) {
-    if (!configured(env)) return;
-    context.waitUntil(syncStalestItem(servicesFor(env)));
+  async scheduled(controller: { scheduledTime: number }, env: Env, context: Context) {
+    context.waitUntil(scheduledWork(env, new Date(controller.scheduledTime))
+      .catch((error) => console.error("scheduled", error)));
   },
 
   async fetch(request: Request, env: Env, context: Context): Promise<Response> {
@@ -295,6 +392,9 @@ export default {
     }
     // The assistant needs only Supabase (to check the session) and Workers AI, not Pluggy.
     if (pathname === "/api/chat") return await chat(env, request);
+    // Push needs Supabase and the VAPID keys, not Pluggy.
+    if (pathname === "/api/push/key" && request.method === "GET") return pushKey(env);
+    if (pathname === "/api/push/test" && request.method === "POST") return await pushTest(env, request);
     if (!configured(env)) {
       return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
     }

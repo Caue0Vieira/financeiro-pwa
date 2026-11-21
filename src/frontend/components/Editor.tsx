@@ -22,6 +22,8 @@ import { dateLabel, kindLabel, money, monthName } from "../format";
 import { findMerchant, inferCategory, isShopping, merchants } from "../merchants";
 import type { EditModal } from "../types";
 
+const commonCategories = ["Alimentação", "Mercado", "Transporte", "Moradia", "Assinaturas", "Compras", "Lazer", "Saúde", "Educação"];
+
 export default function Editor({
   modal,
   data,
@@ -51,6 +53,7 @@ export default function Editor({
     if (type === "investment") removeAction = { type: "deleteInvestment", id: item.id };
     if (type === "target") removeAction = { type: "deleteTarget", id: item.id };
     if (type === "card") removeAction = { type: "archiveCard", id: item.id };
+    if (type === "category-budget") removeAction = { type: "saveCategoryBudget", category: item.category, amount: 0 };
   }
   const today = todayInSaoPaulo();
   const entryDate = (type === "entry" && item?.date) || (today.startsWith(month) ? today : `${month}-01`);
@@ -82,6 +85,12 @@ export default function Editor({
   const [design, setDesign] = useState<string | null>(type === "card" ? (item?.design ?? null) : null);
   const designBank = type === "card" && linkedCard ? findBank(bankName) : undefined;
   const bankOptionsId = useId();
+  const categoryOptionsId = useId();
+  // Categories offered for a new limit: the month's spending first, then the usual ones, without those that have one.
+  const limitCategories = type === "category-budget"
+    ? [...new Set([...data.categories.map(({ name }) => name), ...commonCategories])]
+        .filter((name) => !data.categoryBudgets.some(({ category }) => category.toLowerCase() === name.toLowerCase()))
+    : [];
   const [description, setDescription] = useState(type === "entry" ? (item?.description ?? "") : "");
   const [category, setCategory] = useState(type === "entry" ? (item?.category ?? "") : "");
   const [paymentMethod, setPaymentMethod] = useState(() => {
@@ -138,6 +147,7 @@ export default function Editor({
   const titles: Record<string, string> = {
     entry: item ? "Editar lançamento" : "Novo lançamento",
     budget: "Editar orçamento",
+    "category-budget": item && type === "category-budget" ? `Limite de ${item.category}` : "Novo limite por categoria",
     target: item ? "Editar meta financeira" : "Nova meta financeira",
     contribution: "Registrar aporte",
     investment: item ? "Editar investimento" : "Novo investimento",
@@ -184,6 +194,8 @@ export default function Editor({
         },
       });
     } else if (type === "budget") void mutate({ type: "saveBudget", month, amount: cents(f, "amount") });
+    else if (type === "category-budget")
+      void mutate({ type: "saveCategoryBudget", category: item?.category ?? read(f, "category"), amount: cents(f, "amount") });
     else if (type === "target")
       void mutate({
         type: "saveTarget",
@@ -272,6 +284,33 @@ export default function Editor({
               required
               full
             />
+          )}
+          {type === "category-budget" && (
+            <>
+              {!item && (
+                <Field
+                  label="Categoria"
+                  name="category"
+                  list={categoryOptionsId}
+                  placeholder="Ex.: Alimentação"
+                  maxLength={60}
+                  pattern={".*\\S.*"}
+                  required
+                  full
+                />
+              )}
+              <datalist id={categoryOptionsId}>
+                {limitCategories.map((name) => <option key={name} value={name} />)}
+              </datalist>
+              <MoneyField
+                label="Limite por mês (R$)"
+                name="amount"
+                defaultValue={amount(item?.amount)}
+                required
+                full
+              />
+              <p className="form-hint full">Você recebe uma notificação quando os gastos chegam a 80% e a 100% do limite.</p>
+            </>
           )}
           {type === "target" && (
             <>

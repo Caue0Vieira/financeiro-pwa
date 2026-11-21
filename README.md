@@ -67,6 +67,20 @@ $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create
 
 No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adicionar à Tela de Início** e ative **Abrir como App da Web** quando essa opção aparecer.
 
+### Notificações push
+
+O Worker envia avisos por Web Push (VAPID): conta vencendo amanhã, fatura fechando em 2 dias, gasto alto que chegou pela Pluggy e categoria (ou o mês) que passou de 80% e de 100% do limite. Cada aparelho ativa em **Perfil → Notificações** e escolhe os avisos. No iPhone e no iPad, o push só funciona com o app instalado na tela de início.
+
+1. Aplique a migração [20261121130000_push_notifications.sql](supabase/migrations/20261121130000_push_notifications.sql) no SQL Editor do Supabase. Ela cria as inscrições, o registro do que já foi avisado e os limites por categoria (editados em **Orçamento → Limites por categoria**).
+2. Gere o par de chaves com `node scripts/vapid-keys.mjs` e cadastre os dois valores como segredos, colando cada um quando o terminal pedir. A chave pública não é secreta (o app a lê em `/api/push/key`), mas fica junto da privada para as duas não se separarem. Trocar as chaves invalida as inscrições: cada aparelho precisa ativar de novo.
+
+```sh
+npx cf workers secrets update VAPID_PUBLIC_KEY --worker financeiro-pwa
+npx cf workers secrets update VAPID_PRIVATE_KEY --worker financeiro-pwa
+```
+
+O cron de hora em hora reveza o trabalho por causa do limite de 50 subrequisições do plano gratuito: nas horas pares (horário de Brasília) faz o backup do webhook da Pluggy e nas ímpares envia os avisos, entre 7h e 22h. Sem nenhum aparelho inscrito, o sync roda em todas as horas. O gasto alto também é avisado logo depois do webhook da Pluggy.
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

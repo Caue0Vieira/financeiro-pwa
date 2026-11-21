@@ -5,7 +5,7 @@ import { descriptionKey } from '../src/worker/categorize.ts';
 
 const db = new PGlite();
 await db.exec(`
- create role anon; create role authenticated;
+ create role anon; create role authenticated; create role service_role;
  create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;
@@ -183,12 +183,33 @@ await db.query("update public.transactions set category='Presentes' where id=$1"
 assert.deepEqual((await db.query('select description_key, category from public.category_rules')).rows, [{ description_key: 'uber trip', category: 'Transporte' }]);
 await db.query("update public.transactions set category='Mobilidade' where id=$1", [uberB]);
 assert.equal((await db.query("select category from public.category_rules where description_key='uber trip'")).rows[0].category, 'Mobilidade');
+// Push: each device writes its own subscription and preferences; the Worker owns the rest.
+const p256dh = 'B' + 'A'.repeat(86);
+const endpoint = 'https://fcm.googleapis.com/fcm/send/aparelho-1';
+await db.query("insert into public.push_subscriptions(endpoint,p256dh,auth,preferences) values ($1,$2,'AAAAAAAAAAAAAAAAAAAAAA','{\"billDue\":false}')", [endpoint, p256dh]);
+await db.query("insert into public.push_subscriptions(endpoint,p256dh,auth) values ($1,$2,'AAAAAAAAAAAAAAAAAAAAAA') on conflict (endpoint) do update set endpoint=excluded.endpoint, preferences='{\"budget\":false}'", [endpoint, p256dh]);
+assert.deepEqual((await db.query('select user_id, preferences from public.push_subscriptions')).rows, [{ user_id: owner, preferences: { budget: false } }]);
+await assert.rejects(() => db.query("update public.push_subscriptions set last_sent_at=now()"));
+await assert.rejects(() => db.query("insert into public.push_subscriptions(endpoint,p256dh,auth) values ('http://inseguro.example/x',$1,'AAAAAAAAAAAAAAAAAAAAAA')", [p256dh]));
+await assert.rejects(() => db.query("insert into public.push_subscriptions(endpoint,p256dh,auth) values ('https://fcm.googleapis.com/x','curta','AAAAAAAAAAAAAAAAAAAAAA')"));
+await assert.rejects(() => db.query("select * from public.notification_log"));
+await assert.rejects(() => db.query("select * from public.notification_spending('2026-03-01', array[$1::uuid])", [owner]));
+await db.query("insert into public.category_budgets(category,amount_cents) values ('Transporte',20000)");
+await assert.rejects(() => db.query("insert into public.category_budgets(category,amount_cents) values ('Lazer',0)"));
 await db.exec('reset role');
+// The Worker (service role, no RLS) sums the month's confirmed spending per category.
+const spending = (await db.query("select category, spent from public.notification_spending('2026-03-01', array[$1::uuid]) order by category", [owner])).rows;
+assert.ok(spending.some((row) => row.category === 'Mobilidade' && Number(row.spent) === 1500));
+await db.query("insert into public.notification_log(user_id,kind,ref) values ($1,'bill_due','luz')", [owner]);
+await assert.rejects(() => db.query("insert into public.notification_log(user_id,kind,ref) values ($1,'bill_due','luz')", [owner]));
 const other='00000000-0000-0000-0000-000000000002';
 await db.query('insert into auth.users(id) values ($1)',[other]);
 await db.exec(`select set_config('request.jwt.claim.sub','${other}',false); set role authenticated;`);
 assert.equal((await db.query('select * from public.transactions')).rows.length,0);
 assert.equal((await db.query('select * from public.category_rules')).rows.length,0);
+assert.equal((await db.query('select * from public.push_subscriptions')).rows.length,0);
+assert.equal((await db.query('select * from public.category_budgets')).rows.length,0);
+assert.deepEqual((await db.query('update public.push_subscriptions set preferences=$1 returning id', ['{}'])).rows, []);
 const otherPlanning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;
 assert.deepEqual(otherPlanning,{budget:0,targets:[],valuations:[]});
 assert.deepEqual((await db.query("select public.nitido_expense_days('2026-01-01','2026-02-01') as value")).rows[0].value,[]);

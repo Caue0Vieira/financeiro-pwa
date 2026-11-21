@@ -387,6 +387,21 @@ export default function Editor({
           )}
           {type === "entry" && (
             <>
+              {item?.status === "planned" && (
+                // One tap instead of opening "Data, categoria e situação"; saves the entry as it was.
+                <p className="planned-confirm full">
+                  <span>Previsto para {dateLabel(item.date)}</span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() => void mutate({ type: "saveEntry", entry: { ...item, status: "confirmed" } })}
+                  >
+                    <Icon name="check" size={15} />
+                    {item.amount > 0 ? "Confirmar recebimento" : "Confirmar pagamento"}
+                  </button>
+                </p>
+              )}
               <Field
                 label="Descrição"
                 name="description"

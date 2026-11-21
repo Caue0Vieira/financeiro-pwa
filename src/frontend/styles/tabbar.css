@@ -147,3 +147,38 @@
 @media (prefers-reduced-motion: reduce) {
   .tabbar-item, .tabbar-item svg { transition: none; }
 }
+
+/* Touch gestures (motion/gestures.ts): the script moves these with inline transforms. */
+.pull-indicator,
+.swipe-indicator {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--muted);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  opacity: 0;
+  pointer-events: none;
+}
+.pull-indicator {
+  top: env(safe-area-inset-top, 0px);
+  left: 50%;
+  transform: translate(-50%, -56px);
+}
+.pull-indicator[data-ready="true"],
+.swipe-indicator[data-ready="true"] { color: var(--accent); }
+.pull-indicator[data-busy="true"] svg { animation: pull-spin .8s linear infinite; }
+@keyframes pull-spin { to { transform: rotate(360deg); } }
+.swipe-indicator { top: 50%; margin-top: -20px; left: 0; transform: translateX(-48px); }
+.swipe-indicator[data-side="right"] { left: auto; right: 0; }
+.swipe-indicator[data-side="right"] svg { transform: scaleX(-1); }
+@media (prefers-reduced-motion: reduce) {
+  .pull-indicator[data-busy="true"] svg { animation-duration: 2s; }
+}

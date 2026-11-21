@@ -27,6 +27,7 @@ import "./styles/reference.css";
 import "./styles/liquid-glass.css";
 import "./styles/tabbar.css";
 import { useEntrance, useSpotlight } from "./motion/liquid";
+import { usePageGestures } from "./motion/gestures";
 
 type Props = {
   data: DashboardData;
@@ -42,6 +43,8 @@ type Props = {
 
 type Notice = { message: string; kind: "success" | "error"; exiting?: boolean };
 const toastVisibleMs = 1500;
+/** Pages of the phone tab bar, in order, for swiping between them. */
+const swipeTabs: Page[] = ["home", "analytics", "goals", "profile"];
 const toastExitMs = 180;
 
 export default function FinanceApp({
@@ -70,6 +73,25 @@ export default function FinanceApp({
   const invoiceAlerts = useInvoiceAlerts(data, commands.dashboard);
   useSpotlight(shell);
   useEntrance(shell);
+  const pullIndicator = useRef<HTMLDivElement>(null);
+  const swipeIndicator = useRef<HTMLDivElement>(null);
+  // Swiping sideways walks the tab bar on its pages and goes back everywhere else.
+  const tabIndex = swipeTabs.indexOf(page);
+  const swipeTarget = (direction: 1 | -1): Page | "back" | undefined =>
+    tabIndex >= 0 ? swipeTabs[tabIndex + direction] : direction === -1 ? "back" : undefined;
+  usePageGestures({
+    pull: pullIndicator,
+    swipe: swipeIndicator,
+    refresh: commands.refresh,
+    canSwipe: (direction) => !modal && Boolean(swipeTarget(direction)),
+    onSwipe: (direction) => {
+      const target = swipeTarget(direction);
+      if (!target) return false;
+      if (target === "back") goBack();
+      else navigate(target);
+      return true;
+    },
+  });
 
   useEffect(() => {
     if (!moveFocus.current) return;
@@ -298,6 +320,12 @@ export default function FinanceApp({
           </BackNavigation.Provider>
         </main>
         <MobileNav page={page} navigate={navigate} onAdd={add} />
+        <div className="pull-indicator" ref={pullIndicator} aria-hidden="true">
+          <Icon name="refresh" size={20} />
+        </div>
+        <div className="swipe-indicator" ref={swipeIndicator} aria-hidden="true">
+          <Icon name="chevronLeft" size={22} />
+        </div>
         {modal?.type === "card-picker" ? (
           <CardPicker
             accounts={data.accounts}

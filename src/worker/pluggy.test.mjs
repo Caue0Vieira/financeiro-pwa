@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
-import { bankNameFor, invoiceMonthFor, mapTransaction, purchasesAreNegative, saoPauloDate } from './mapping.ts';
+import { bankNameFor, invoiceMonthFor, mapTransaction, purchasesAreNegative, saoPauloDate, spreadInstallments } from './mapping.ts';
 
 test('Meu Pluggy connections take the bank name from their accounts', () => {
   assert.equal(bankNameFor('Banco Inter', []), 'Banco Inter');
@@ -114,4 +114,16 @@ test('webhook signatures are checked against the raw body and time window', asyn
   assert.equal(await validSignature(`t=${t},v1=${v1}`, body, 'whsec_other', now), false);
   assert.equal(await validSignature(`t=${t},v1=${v1}`, body, secret, now + 6 * 60_000), false);
   assert.equal(await validSignature(null, body, secret, now), false);
+});
+
+test('installments sent all at once on the purchase date go one per month; monthly ones stay', () => {
+  const row = (description, n, count, date, invoice = null) =>
+    ({ description, installment_number: n, installment_count: count, occurred_on: date, invoice_month: invoice });
+  const duo = [1, 2, 3, 12].map((n) => row('CP PARC DUO GOURMET', n, 12, '2026-11-05'));
+  const shop = [row('LOJAS RENNER', 1, 2, '2026-06-09', '2026-07-01'), row('LOJAS RENNER', 2, 2, '2026-07-10', '2026-08-01')];
+  const result = spreadInstallments([...duo, ...shop, row('Mercado', null, null, '2026-11-05')]);
+  assert.deepEqual(result.slice(0, 4).map((r) => r.occurred_on), ['2026-11-05', '2026-12-05', '2027-01-05', '2027-10-05']);
+  assert.deepEqual(result.slice(4, 6), shop);
+  assert.deepEqual(spreadInstallments([row('X', 1, 3, '2026-01-31', '2026-02-01'), row('X', 2, 3, '2026-01-31', '2026-02-01')])[1],
+    row('X', 2, 3, '2026-02-28', '2026-03-01'));
 });

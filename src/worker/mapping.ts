@@ -1,4 +1,4 @@
-import { invoiceMonthOf } from "../date.ts";
+import { dateInMonth, invoiceMonthOf, shiftMonth } from "../date.ts";
 
 /** Pure mapping of Pluggy accounts and transactions to app rows. No I/O, so it is unit tested. */
 
@@ -224,4 +224,35 @@ export function mapTransaction(
     kind: income ? "income" : name === "Investimentos" ? "investment" : "expense",
     category: name,
   };
+}
+
+/**
+ * Some cards send every installment of a purchase at once, all on the purchase date (Duo Gourmet
+ * in 12x came as 12 rows on 05/11), so they would all land in one invoice. Installments of the
+ * same purchase on the same day move to their own month: number n goes n - first months later.
+ * Purchases whose installments already come one per month are left as they are.
+ */
+export function spreadInstallments<T extends Pick<TransactionRow, "occurred_on" | "description" | "installment_number" | "installment_count" | "invoice_month">>(rows: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    if ((row.installment_count ?? 1) < 2 || !row.installment_number) continue;
+    const key = `${row.description}\u0000${row.installment_count}\u0000${row.occurred_on}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  const moved = new Map<T, T>();
+  for (const group of groups.values()) {
+    if (new Set(group.map((row) => row.installment_number)).size < 2) continue;
+    const first = Math.min(...group.map((row) => row.installment_number!));
+    for (const row of group) {
+      const months = row.installment_number! - first;
+      if (!months) continue;
+      const day = Number(row.occurred_on.slice(8, 10));
+      moved.set(row, {
+        ...row,
+        occurred_on: dateInMonth(shiftMonth(row.occurred_on.slice(0, 7), months), day),
+        invoice_month: row.invoice_month && `${shiftMonth(row.invoice_month.slice(0, 7), months)}-01`,
+      });
+    }
+  }
+  return rows.map((row) => moved.get(row) ?? row);
 }

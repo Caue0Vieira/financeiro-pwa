@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { bankNameFor, dayOf, mapTransaction, purchasesAreNegative, saoPauloDate, type PluggyAccount } from "./mapping";
+import { bankNameFor, dayOf, mapTransaction, purchasesAreNegative, saoPauloDate, spreadInstallments, type PluggyAccount } from "./mapping";
 import { inferCategory } from "../frontend/merchants";
 import { descriptionKey, loadRules } from "./categorize";
 import type { Pluggy, PluggyItem } from "./pluggy";
@@ -117,9 +117,9 @@ export async function syncItem(
     if (!transactions.length) continue;
 
     const purchasesNegative = account.type === "CREDIT" && purchasesAreNegative(transactions);
-    const rows = transactions
+    const rows = spreadInstallments(transactions
       .map((tx) => mapTransaction(tx, account, { closingDay, dueDay, purchasesNegative, categorize, today }))
-      .filter((row) => row !== null);
+      .filter((row) => row !== null));
 
     // Everything this account already imported in the window (dates in São Paulo can be a day
     // before Pluggy's UTC date, hence the margin).

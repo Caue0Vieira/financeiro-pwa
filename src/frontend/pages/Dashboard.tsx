@@ -3,7 +3,6 @@ import type { Dashboard as DashboardData } from "../../contracts";
 import { Avatar, Entries, EntryRow, Icon, type IconName } from "../components/common";
 import { HomeCardArt } from "../components/HomeCardArt";
 import { SummaryCard } from "../components/SummaryCard";
-import { ForecastPanel } from "../components/ForecastPanel";
 import { addDays, todayInSaoPaulo } from "../../date";
 import { dateLabel, money } from "../format";
 import type { OpenEditor, Page } from "../types";
@@ -137,7 +136,6 @@ export default function Dashboard({
               onSetGoal={() => openEditor({ type: "goal" })}
             />
           )}
-          {data.forecast && <ForecastPanel forecast={data.forecast} onOpenBills={() => navigate("commitments")} />}
           {invoiceReminders}
           <section className="panel recent-panel screen-list">
             <header className="panel-head">

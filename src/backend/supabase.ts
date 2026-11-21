@@ -7,7 +7,6 @@ import { spendingWindow, summarizeSpending } from "./spending";
 import { autoRecordDate, chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import { normalizePreferences } from "../notices";
 import { summaryFrom } from "../summary";
-import { projectBalance } from "../forecast";
 import { detectAnnualPlans, detectSubscriptions, lookbackDays, sortSubscriptions, type ChargeGroup } from "../subscriptions";
 import type {
   Assistant,
@@ -187,19 +186,6 @@ export function createSupabaseService(
       fail(error);
     },
     test: (endpoint) => api<void>("/api/push/test", "POST", { endpoint }),
-  };
-  /**
-   * Stores the forecast's negative day for the push notice (the cron reads it). Written only when
-   * it changes, not on every refresh; failures are ignored (the screen already shows the alert).
-   */
-  let storedForecast = "";
-  const rememberForecast = async (forecast: NonNullable<Dashboard["forecast"]>) => {
-    const row = { month: first(currentMonth()), negative_on: forecast.negativeOn, lowest_cents: forecast.lowest.balance };
-    const key = JSON.stringify(row);
-    if (key === storedForecast) return;
-    storedForecast = key;
-    const { error } = await db.from("balance_forecasts").upsert({ ...row, updated_at: new Date().toISOString() });
-    if (error) storedForecast = "";
   };
   const summaryColumns = "month, numbers, text, dismissed_at";
   const summaries: Summaries = {
@@ -657,14 +643,13 @@ export function createSupabaseService(
       };
     },
     async dashboard(month): Promise<Dashboard> {
-      const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary, bankAccounts] = await Promise.all([
+      const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary] = await Promise.all([
         db.rpc("monthly_dashboard", { p_month: first(month) }),
         db.rpc("nitido_planning", { p_month: first(month) }),
         db.from("card_invoice_dates").select("card_id, closing_on, due_on").eq("month", first(month)),
         db.from("category_budgets").select("category, amount_cents").order("category"),
         db.from("monthly_summaries").select(summaryColumns)
           .eq("month", first(shiftMonth(currentMonth(), -1))).is("dismissed_at", null).maybeSingle(),
-        db.from("pluggy_accounts").select("balance_cents").not("account_id", "is", null),
       ]);
       fail(error);
       fail(planning.error);
@@ -829,18 +814,6 @@ export function createSupabaseService(
           paid,
         };
       });
-      // Balance forecast (current month only), from the bank balances Open Finance brought.
-      const balances = (bankAccounts.error ? [] : bankAccounts.data ?? [])
-        .filter((x) => x.balance_cents != null).map((x) => Number(x.balance_cents));
-      const forecast = month.slice(0, 7) === currentMonth()
-        ? projectBalance({
-          today: todayInSaoPaulo(),
-          entries,
-          invoices: invoiceList,
-          bankBalance: balances.length ? balances.reduce((a, b) => a + b, 0) : undefined,
-        })
-        : null;
-      if (forecast) void rememberForecast(forecast);
       const received = sum(income.filter((e) => e.status === "confirmed")),
         expectedIncome = sum(income),
         expenseTotal = -sum(expenses),
@@ -931,7 +904,6 @@ export function createSupabaseService(
         })),
         // Until the monthly_summaries migration is applied there is no summary card.
         summary: lastSummary.error || !lastSummary.data ? null : summaryFrom(lastSummary.data),
-        forecast,
         coverage: batches
           .filter((x) => x.coverage_start && x.coverage_end)
           .map((x) => ({ month, from: x.coverage_start, to: x.coverage_end })),

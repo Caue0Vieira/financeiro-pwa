@@ -173,20 +173,6 @@ export async function loadItems(db: SupabaseClient, devices: Device[], kinds: No
     }
   }
 
-  if (kinds.includes("negative_balance") && usersWanting("negative_balance").length) {
-    // The app stores the forecast's negative day when it computes it; recent ones only.
-    const rows = await db.from("balance_forecasts").select("user_id, negative_on, lowest_cents")
-      .in("user_id", usersWanting("negative_balance")).eq("month", first(month)).gt("negative_on", today)
-      .gte("updated_at", new Date(now.getTime() - 3 * 86_400_000).toISOString());
-    fail(rows.error);
-    for (const row of rows.data ?? []) {
-      add(row.user_id, [{
-        kind: "negative_balance", ref: `${month}:${row.negative_on}`, label: "Saldo",
-        amount: Math.max(0, -Number(row.lowest_cents)), date: row.negative_on,
-      }]);
-    }
-  }
-
   if (kinds.includes("subscription") && usersWanting("subscription").length) {
     const wanting = usersWanting("subscription");
     const [charges, decisions] = await Promise.all([

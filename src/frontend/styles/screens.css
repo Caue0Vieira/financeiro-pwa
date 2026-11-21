@@ -566,28 +566,6 @@
 .summary-entry > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 10px; }
 
 /* ——— Previsão de saldo (painel) ——— */
-.forecast-panel .panel-head p { font-size: .8rem; }
-.forecast-alert { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 12px; padding: 12px; border-radius: 14px; background: var(--danger-soft); color: var(--danger); }
-.forecast-alert svg { flex: none; margin-top: 2px; }
-.forecast-alert p { margin: 0; font-size: .86rem; line-height: 1.45; color: var(--text); }
-.forecast-alert strong { display: block; color: var(--danger); font-size: .95rem; }
-.forecast-alert .text-button { padding: 0; }
-.forecast-values { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 8px; }
-.forecast-values dt { color: var(--muted); font-size: .76rem; }
-.forecast-values dd { margin: 2px 0 0; font-weight: 750; font-variant-numeric: tabular-nums; }
-.forecast-values .negative { color: var(--danger); }
-.balance-chart { margin: 0; }
-.balance-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-.balance-real, .balance-projected { fill: none; stroke: var(--chart-income); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
-.balance-projected { stroke-dasharray: 5 5; opacity: .8; }
-.balance-zero { stroke: var(--danger); stroke-width: 1; stroke-dasharray: 2 4; opacity: .6; }
-.balance-today { fill: var(--chart-income); stroke: var(--surface); stroke-width: 2; }
-.balance-negative { fill: var(--danger); stroke: var(--surface); stroke-width: 2; }
-.balance-axis { fill: var(--muted); font-size: 10px; }
-.balance-chart figcaption { display: flex; gap: 14px; margin-top: 6px; color: var(--muted); font-size: .76rem; }
-.balance-chart figcaption span { display: inline-flex; align-items: center; gap: 6px; }
-.legend-real, .legend-projected { display: inline-block; width: 18px; border-top: 2.4px solid var(--chart-income); }
-.legend-projected { border-top-style: dashed; }
 .nowrap { white-space: nowrap; }
 
 /* ——— Assinaturas detectadas ——— */

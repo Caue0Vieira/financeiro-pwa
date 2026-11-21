@@ -134,20 +134,6 @@ export interface Dashboard {
   categoryBudgets: CategoryBudget[];
   /** Last month's summary while it wasn't dismissed (card on the home screen). */
   summary?: MonthlySummary | null;
-  /** Day-by-day balance of the current month (null for other months); src/forecast.ts. */
-  forecast?: BalanceForecast | null;
-}
-
-export interface BalanceForecast {
-  /** "bank": starts from the accounts' balance (Open Finance); "month": from zero on day 1. */
-  basis: 'bank' | 'month';
-  /** Every day of the month; `projected` after today. */
-  points: { date: string; balance: number; projected: boolean }[];
-  today: number;
-  end: number;
-  lowest: { date: string; balance: number };
-  /** First projected day below zero (null when it doesn't happen or it is already negative). */
-  negativeOn: string | null;
 }
 
 export interface MonthlySummaryNumbers {
@@ -318,8 +304,6 @@ export interface PushPreferences {
   budget: boolean;
   /** Last month's summary is ready (day 1). */
   monthlySummary: boolean;
-  /** The balance forecast shows a negative day this month. */
-  negativeBalance: boolean;
   /** A new subscription was found or one got more expensive. */
   subscriptions: boolean;
 }

@@ -15,6 +15,9 @@ test('the manifest keeps its URL and switches only the icons to the chosen varia
   assert.equal(manifest.icons[2].purpose, 'maskable');
   assert.equal(manifest.id, '/');
   assert.equal(manifest.start_url, '/');
+  assert.deepEqual(manifest.shortcuts.map(({ name, url, icons }) => [name, url, icons[0].src]), [
+    ['Novo gasto', '/?novo=gasto', '/icons/rubi/icon-192.png?v=4'],
+  ]);
 });
 
 test('unknown or missing choices fall back to the default icon', () => {

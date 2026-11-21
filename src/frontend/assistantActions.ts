@@ -1,5 +1,6 @@
-import type { Action, Card, Dashboard } from "../contracts.ts";
-import { dateInMonth, invoiceMonthOf, shiftMonth } from "../date.ts";
+import type { Account, Action, Card, Dashboard } from "../contracts.ts";
+import { addDays, dateInMonth, invoiceMonthOf, shiftMonth } from "../date.ts";
+import { chargeInvoiceMonth } from "../recurring.ts";
 import type { PaymentMode, PurchaseInput, PurchaseSimulation } from "./purchase.ts";
 
 /**
@@ -23,7 +24,18 @@ export type ProposedAction =
       firstMonth: string;
       category: string;
     }
-  | { type: "recurring"; flow: Flow; description: string; amount: number; day: number; startMonth: string; category: string };
+  | { type: "recurring"; flow: Flow; description: string; amount: number; day: number; startMonth: string; category: string }
+  /** Something already spent or received ("gastei 45 no ifood ontem"): a confirmed entry. */
+  | {
+      type: "entry";
+      flow: Flow;
+      description: string;
+      amount: number;
+      date: string;
+      category: string;
+      /** "card:<id>", "account:<id>" or "" (neither). */
+      payWith: string;
+    };
 
 export interface Proposal {
   id: string;
@@ -112,7 +124,7 @@ export function splitAnswer(text: string): { text: string; raw: unknown[] } {
   return { text: visibleAnswer(text), raw: list };
 }
 
-type Context = Pick<Dashboard, "cards"> & { today: string };
+type Context = Pick<Dashboard, "cards"> & { today: string; accounts?: readonly Account[] };
 
 const text = (value: unknown, max = 80) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 const monthOf = (value: unknown, fallback: string, today: string) => {
@@ -135,7 +147,7 @@ export function firstCardMonth(card: Card | undefined, today: string) {
 }
 
 /** Validates one action the AI proposed; null when it can't be used. */
-export function toProposed(raw: unknown, { cards, today }: Context): ProposedAction | null {
+export function toProposed(raw: unknown, { cards, today, accounts }: Context): ProposedAction | null {
   if (!raw || typeof raw !== "object") return null;
   const item = raw as Record<string, unknown>;
   const kind = fold(text(item.tipo));
@@ -169,6 +181,19 @@ export function toProposed(raw: unknown, { cards, today }: Context): ProposedAct
       cardId: payWith === "card" ? (card?.id ?? (cards.length === 1 ? cards[0].id : "")) : "",
       firstMonth: monthOf(item.mes_inicio ?? item.mes, payWith === "card" ? firstCardMonth(card, today) : nextMonth, today),
       category: category || "Compras",
+    };
+  }
+  if (kind === "gasto" || kind === "recebido") {
+    const amount = parseMoney(item.valor);
+    if (!amount || amount > maxCents) return null;
+    const flow: Flow = kind === "recebido" ? "income" : "expense";
+    const day = text(item.data, 10);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= today && day >= addDays(today, -62) ? day : today;
+    const paid = text(item.pagamento);
+    return {
+      type: "entry", flow, description, amount, date,
+      category: category || (flow === "income" ? "Receitas" : "Compras"),
+      payWith: paid ? paymentFor(paid, cards, accounts ?? []) : "",
     };
   }
   if (kind === "recorrente") {
@@ -212,6 +237,7 @@ export function proposalFromSimulation(sim: PurchaseSimulation, cardId: string |
 /** Why the proposal can't be saved yet; empty when it can. */
 export function proposalProblem(action: ProposedAction) {
   if (!action.description.trim()) return "Informe uma descrição.";
+  if (action.type === "entry" && !/^\d{4}-\d{2}-\d{2}$/.test(action.date)) return "Informe a data.";
   const amount = action.type === "installments" ? action.total : action.amount;
   if (!amount || amount <= 0) return "Informe um valor.";
   if (action.type === "installments") {
@@ -223,8 +249,23 @@ export function proposalProblem(action: ProposedAction) {
 }
 
 /** The app actions that record a confirmed proposal (same shapes the screens send). */
-export function toMutations(action: ProposedAction, today: string): Action[] {
+export function toMutations(action: ProposedAction, today: string, cards: readonly Card[] = []): Action[] {
   switch (action.type) {
+    case "entry": {
+      const cardId = action.payWith.startsWith("card:") ? action.payWith.slice(5) : undefined;
+      const accountId = action.payWith.startsWith("account:") ? action.payWith.slice(8) : undefined;
+      return [{
+        type: "saveEntry",
+        entry: {
+          date: action.date, description: action.description.trim(),
+          amount: action.flow === "income" ? action.amount : -action.amount,
+          kind: action.flow, status: action.date <= today ? "confirmed" : "planned", category: action.category,
+          accountId, cardId,
+          // A card purchase is billed in the invoice its date falls into.
+          invoiceMonth: cardId ? chargeInvoiceMonth(action.date, cards.find(({ id }) => id === cardId)) : undefined,
+        },
+      }];
+    }
     case "once":
       return [{
         type: "saveEntry",
@@ -274,4 +315,142 @@ export function actionsGuide(today: string, cards: readonly Card[]) {
     `DATA: hoje é ${today}; mês atual ${month}; próximo mês ${shiftMonth(month, 1)}.`,
     `Cartões cadastrados: ${cards.filter((card) => !card.archived).map((card) => card.name).join(", ") || "nenhum"}.`,
   ].join("\n");
+}
+
+/** "card:<id>" or "account:<id>" for the card or account named in the text; "" when none. */
+export function paymentFor(text: string, cards: readonly Card[], accounts: readonly Account[]) {
+  const active = cards.filter((item) => !item.archived);
+  const card = findCard(text, active);
+  if (card) return `card:${card.id}`;
+  const folded = fold(text);
+  const account = accounts.find((item) =>
+    fold(item.name).split(/[^a-z0-9]+/).filter((word) => word.length >= 3 && !["banco", "conta", "corrente"].includes(word))
+      .some((word) => new RegExp(`\\b${word}\\b`).test(folded)));
+  if (account) return `account:${account.id}`;
+  if (/\b(pix|debito|dinheiro|na conta|transferencia)\b/.test(folded) && accounts.length === 1) return `account:${accounts[0].id}`;
+  if (/\b(cartao|credito)\b/.test(folded) && active.length === 1) return `card:${active[0].id}`;
+  return "";
+}
+
+const weekdays = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+/** Regex source matching a folded word with or without its accents. */
+const accented = (word: string) =>
+  word.replace(/a/g, "[aáàâã]").replace(/e/g, "[eéê]").replace(/i/g, "[ií]").replace(/o/g, "[oóôõ]").replace(/u/g, "[uú]").replace(/c/g, "[cç]");
+
+/** Date said in the message ("ontem", "dia 12", "12/11", "na segunda") and how to cut it out; null when none. */
+export function spokenDate(text: string, today: string): { date: string; match: RegExp } | null {
+  const folded = fold(text);
+  const relative = folded.match(/\b(anteontem|ontem|hoje)\b/);
+  if (relative) {
+    const back = { hoje: 0, ontem: 1, anteontem: 2 }[relative[1] as "hoje" | "ontem" | "anteontem"];
+    return { date: addDays(today, -back), match: /\b(anteontem|ontem|hoje)\b/i };
+  }
+  const slash = folded.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (slash) {
+    const day = Number(slash[1]);
+    const month = Number(slash[2]);
+    const given = slash[3] ? Number(slash[3]) : undefined;
+    let year = given ? (given < 100 ? 2000 + given : given) : Number(today.slice(0, 4));
+    const build = () => `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    // Without a year, a date after today is from last year.
+    if (!given && build() > today) year--;
+    const date = build();
+    if (month >= 1 && month <= 12 && day >= 1 && dateInMonth(date.slice(0, 7), day) === date) {
+      return { date, match: /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/ };
+    }
+  }
+  const dayOnly = folded.match(/\b(?:no\s+)?dia\s+(\d{1,2})\b/);
+  if (dayOnly && Number(dayOnly[1]) >= 1 && Number(dayOnly[1]) <= 31) {
+    let month = today.slice(0, 7);
+    if (dateInMonth(month, Number(dayOnly[1])) > today) month = shiftMonth(month, -1);
+    return { date: dateInMonth(month, Number(dayOnly[1])), match: /\b(?:no\s+)?dia\s+\d{1,2}\b/i };
+  }
+  const weekday = weekdays.findIndex((name) => new RegExp(`\\b${name}(-feira)?\\b`).test(folded));
+  if (weekday >= 0) {
+    const current = new Date(`${today}T12:00:00Z`).getUTCDay();
+    // The last one before today ("na segunda" said on a Monday means a week ago).
+    const back = (current - weekday + 7) % 7 || 7;
+    const name = accented(weekdays[weekday]);
+    return {
+      date: addDays(today, -back),
+      match: new RegExp(`\\b(?:(?:na|no|nesta|neste|${accented("ultima")}|${accented("ultimo")})\\s+)?${name}(?:-feira)?(?:\\s+passad[ao])?\\b`, "i"),
+    };
+  }
+  return null;
+}
+
+/**
+ * Quick entry in the chat: "gastei 45 no ifood ontem no nubank", "recebi 300 de freela",
+ * "comprei uma TV de 3000 em 10x no inter". Parsed here, without the AI, into a proposal the user
+ * confirms. Null when the message doesn't state something spent or received.
+ */
+export function parseQuickEntry(
+  message: string,
+  context: {
+    cards: readonly Card[];
+    accounts: readonly Account[];
+    today: string;
+    /** Category from the description (src/frontend/merchants.ts in the app). */
+    categorize?: (description: string) => string;
+    /** Known merchant's name ("ifood" → "iFood"). */
+    merchantName?: (description: string) => string | undefined;
+  },
+): ProposedAction | null {
+  const folded = fold(message);
+  if (/\?|\b(posso|devo|quanto|vale a pena|consigo|e se|deveria)\b/.test(folded)) return null;
+  const verb = folded.match(/\b(gastei|paguei|comprei|torrei|recebi|ganhei)\b/);
+  if (!verb) return null;
+  const flow: Flow = verb[1] === "recebi" || verb[1] === "ganhei" ? "income" : "expense";
+  const { today, cards, accounts } = context;
+
+  let rest = ` ${message.trim()} `;
+  const when = spokenDate(message, today);
+  if (when) rest = rest.replace(when.match, " ");
+  const countMatch = rest.match(/\b(?:em\s+)?(\d{1,2})\s*(?:x|vezes|parcelas)\b/i);
+  const count = countMatch ? Number(countMatch[1]) : 1;
+  if (countMatch) rest = rest.replace(countMatch[0], " ");
+  const moneyMatch = rest.match(/(?:\b(?:de|por)\s+)?(?:r\$\s*)?\b\d[\d.]*(?:,\d{1,2})?\b\s*(?:mil\b|k\b)?(?:\s*(?:reais|real|contos?|pila)\b)?/i);
+  const amount = moneyMatch ? parseMoney(moneyMatch[0].replace(/^(de|por)\s+/i, "")) : undefined;
+  if (!moneyMatch || !amount || amount > maxCents) return null;
+  rest = rest.replace(moneyMatch[0], " ");
+
+  // Take the card or account out of the description ("no nubank", "pelo cartão inter").
+  const payWith = paymentFor(message, cards, accounts);
+  const named = payWith.startsWith("card:")
+    ? cards.find(({ id }) => `card:${id}` === payWith)?.name
+    : accounts.find(({ id }) => `account:${id}` === payWith)?.name;
+  const nameWords = fold(named ?? "").split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3 && !["cartao", "credito", "banco", "conta"].includes(word));
+  if (named) {
+    const fullName = fold(named).split(/[^a-z0-9]+/).filter(Boolean).map(accented).join("\\s+");
+    rest = rest.replace(new RegExp(`\\b(?:(?:no|na|pelo|pela|com\\s+o|com\\s+a)\\s+)?${fullName}\\b`, "i"), " ");
+  }
+  for (const word of nameWords) {
+    rest = rest.replace(new RegExp(
+      `\\b(?:(?:no|na|pelo|pela|com\\s+o|com\\s+a|do|da)\\s+)?(?:cart[aã]o\\s+(?:de\\s+cr[eé]dito\\s+)?(?:do\\s+|da\\s+)?)?${accented(word)}\\b`, "i"), " ");
+  }
+  rest = rest
+    .replace(/\b(?:no|na|pelo|pela|via|com|por|em)\s+(?:o\s+|a\s+)?(?:pix|d[eé]bito|cr[eé]dito|dinheiro|cart[aã]o|boleto)\b/gi, " ")
+    .replace(/\b(?:eu\s+)?(gastei|paguei|comprei|torrei|recebi|ganhei)\b/i, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;!]+$/, "")
+    .replace(/^(?:(?:o|a|os|as|um|uma|uns|umas|no|na|nos|nas|em|com|de|do|da|pro|pra|para|pelo|pela)\s+)+/i, "")
+    .trim()
+    .slice(0, 60);
+  const description = (rest && (context.merchantName?.(rest) ?? rest.charAt(0).toUpperCase() + rest.slice(1)))
+    || (flow === "income" ? "Receita" : "Gasto");
+  const date = when?.date ?? today;
+  const category = context.categorize?.(description) || (flow === "income" ? "Receitas" : "Compras");
+
+  if (count > 1 && flow === "expense") {
+    const card = cards.find(({ id }) => `card:${id}` === payWith);
+    const onCard = Boolean(card) || (!payWith.startsWith("account:") && cards.length > 0);
+    return {
+      type: "installments", description, total: amount, count: Math.min(count, 48),
+      payWith: onCard ? "card" : "account", cardId: card?.id ?? (onCard && cards.length === 1 ? cards[0].id : ""),
+      firstMonth: onCard ? firstCardMonth(card, date) : shiftMonth(date.slice(0, 7), 1), category,
+    };
+  }
+  return { type: "entry", flow, description, amount, date, category, payWith };
 }

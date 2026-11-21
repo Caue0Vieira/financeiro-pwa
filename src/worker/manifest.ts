@@ -1,6 +1,7 @@
 import { defaultIcon, iconCookie, iconPath, isAppIcon } from "../appIcons.ts";
 
-type Manifest = { icons: { src: string }[] } & Record<string, unknown>;
+type Icon = { src: string };
+type Manifest = { icons: Icon[]; shortcuts?: { icons?: Icon[] }[] } & Record<string, unknown>;
 
 /** The icon chosen in the app (cookie set by theme/appIcon.ts), or the default one. */
 export function chosenIcon(cookieHeader: string | null) {
@@ -16,9 +17,12 @@ export function chosenIcon(cookieHeader: string | null) {
 export function manifestFor(source: string, cookieHeader: string | null) {
   const manifest = JSON.parse(source) as Manifest;
   const icon = chosenIcon(cookieHeader);
-  manifest.icons = manifest.icons.map((entry) => {
+  const pointed = (entries: Icon[]) => entries.map((entry) => {
     const file = entry.src.match(/\/([^/?]+\.png)/)?.[1];
     return file ? { ...entry, src: iconPath(icon, file) } : entry;
   });
+  manifest.icons = pointed(manifest.icons);
+  // Shortcuts ("Novo gasto") show the same icon as the app.
+  manifest.shortcuts = manifest.shortcuts?.map((shortcut) => (shortcut.icons ? { ...shortcut, icons: pointed(shortcut.icons) } : shortcut));
   return JSON.stringify(manifest);
 }

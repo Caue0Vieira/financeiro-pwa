@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answer, chatMessages, ChatInputError, limits, quotaExceeded, textStream } from './assistant.ts';
+import { answer, chatMessages, ChatInputError, limits, quotaExceeded, systemPrompt, textStream } from './assistant.ts';
 
 test('the app context goes in the system prompt and the history is trimmed', () => {
   const history = Array.from({ length: 10 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }));
@@ -24,7 +24,7 @@ test('an empty question is refused and long inputs are cut', () => {
   assert.throws(() => chatMessages({ question: '   ' }), ChatInputError);
   const messages = chatMessages({ question: 'x'.repeat(5000), context: 'y'.repeat(50_000) });
   assert.equal(messages.at(-1).content.length, limits.question);
-  assert.ok(messages[0].content.length < limits.context + 2000);
+  assert.ok(messages[0].content.length < limits.context + systemPrompt.length + 100);
 });
 
 test('the Workers AI daily limit is recognised', () => {

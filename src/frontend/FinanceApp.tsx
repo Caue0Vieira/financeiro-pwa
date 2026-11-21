@@ -109,8 +109,11 @@ export default function FinanceApp({
   });
 
   // A link opened the app on a screen: drop the parameter so a reload starts at home.
+  // "Novo gasto" (manifest shortcut) opens the entry editor straight away.
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("novo") === "gasto") openEditor({ type: "entry", kind: "expense" });
     if (window.location.search) window.history.replaceState(window.history.state, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // A tapped notification while the app is open: the service worker asks for the screen.

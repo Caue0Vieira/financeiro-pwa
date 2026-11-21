@@ -93,6 +93,10 @@ O painel projeta o saldo dia a dia até o fim do mês ([src/forecast.ts](src/for
 
 A tela **Assinaturas** (em **Mais**) encontra cobranças recorrentes nos últimos 13 meses ([src/subscriptions.ts](src/subscriptions.ts)): o mesmo estabelecimento (descrição normalizada, sem códigos como `PG *`), com valor parecido (±15% de uma cobrança para a seguinte) e intervalo mensal ou anual. Mostra o custo por mês e por ano, marca as novas e as que ficaram mais caras e manda push nesses casos. Cada escolha ("É assinatura" ou "Ignorar") fica guardada por estabelecimento e vale para as próximas detecções. Aplique a migração [20261121160000_subscription_detector.sql](supabase/migrations/20261121160000_subscription_detector.sql).
 
+### Lançamento rápido
+
+No chat do assistente, frases como "gastei 45 no ifood ontem no nubank", "paguei 23,90 de uber no pix", "recebi 300 de freela" ou "comprei uma TV de 3 mil em 10x no inter" viram um cartão de cadastro para conferir e confirmar. O app entende valor, data (hoje, ontem, dia 12, 12/11, "na sexta"), cartão ou conta e estabelecimento sozinho, sem a IA ([parseQuickEntry](src/frontend/assistantActions.ts)), então funciona também na demonstração; frases fora desse padrão seguem para a IA, que pode propor o mesmo cadastro. No app instalado, segure o ícone e toque em **Novo gasto** para abrir o lançamento direto.
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

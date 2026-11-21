@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { Action, Card, Dashboard } from "../../contracts";
+import type { Account, Action, Card, Dashboard } from "../../contracts";
 import { todayInSaoPaulo } from "../../date";
 import MoneyField from "../components/MoneyField";
 import { Field } from "../components/Field";
 import { Select } from "../components/Select";
-import { Icon, PageHeading } from "../components/common";
+import { Icon, PageHeading, type IconName } from "../components/common";
+import { findMerchant, inferCategory } from "../merchants";
 import { cardLabel, money } from "../format";
 import {
-  actionsGuide, parsePurchaseQuestion, proposalFromSimulation, proposalProblem, proposalsFrom, purchaseName,
+  actionsGuide, parsePurchaseQuestion, parseQuickEntry, proposalFromSimulation, proposalProblem, proposalsFrom, purchaseName,
   splitAnswer, toMutations, visibleAnswer, type Proposal, type ProposedAction,
 } from "../assistantActions";
 import { describeSimulation, financialSummary, simulatePurchase, type PurchaseSimulation } from "../purchase";
@@ -109,6 +110,23 @@ export default function Assistant({ data, commands, showNotice }: Props) {
     if (!text || busy) return;
     setDraft("");
     const today = todayInSaoPaulo();
+    // "gastei 45 no ifood ontem": understood here, no AI needed (also works offline and in the demo).
+    const entry = parseQuickEntry(text, {
+      cards, accounts: data.accounts, today, categorize: inferCategory,
+      merchantName: (description) => findMerchant(description)?.name,
+    });
+    if (entry) {
+      setMessages((list) => [
+        ...list,
+        { id: crypto.randomUUID(), role: "user", content: text },
+        {
+          id: crypto.randomUUID(), role: "assistant",
+          content: "Entendi assim. Confira os dados e toque em Cadastrar.",
+          proposals: [{ id: crypto.randomUUID(), action: entry, status: "pending" }],
+        },
+      ]);
+      return;
+    }
     const purchase = parsePurchaseQuestion(text, cards);
     const simulation = purchase ? simulatePurchase(data, { ...purchase, today }) : undefined;
     const lastSimulation = [...messages].reverse().find((m) => m.simulation)?.simulation;
@@ -139,7 +157,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
         update(answerId, (m) => ({ ...m, content: visibleAnswer(raw) }));
       });
       const { text: shown, raw: actions } = splitAnswer(raw);
-      const proposals = proposalsFrom(actions, { cards, today });
+      const proposals = proposalsFrom(actions, { cards, today, accounts: data.accounts });
       update(answerId, (m) => ({ ...m, content: shown, proposals: proposals.length ? proposals : undefined }));
     } catch (failure) {
       const message = failure instanceof Error ? failure.message : "O assistente não respondeu.";
@@ -166,7 +184,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
     if (saving || proposalProblem(proposal.action)) return;
     setSaving(proposal.id);
     try {
-      for (const action of toMutations(proposal.action, todayInSaoPaulo()) as Action[]) await commands.mutate(action);
+      for (const action of toMutations(proposal.action, todayInSaoPaulo(), cards) as Action[]) await commands.mutate(action);
       update(messageId, (m) => ({
         ...m,
         proposals: m.proposals?.map((p) => (p.id === proposal.id ? { ...p, status: "saved" } : p)),
@@ -245,6 +263,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
                 key={proposal.id}
                 proposal={proposal}
                 cards={cards}
+                accounts={data.accounts}
                 saving={saving === proposal.id}
                 onChange={(change) => editProposal(message.id, proposal.id, change)}
                 onConfirm={() => void confirm(message.id, proposal)}
@@ -359,6 +378,8 @@ function SimulationCard({ simulation }: { simulation: PurchaseSimulation }) {
 }
 
 const proposalTitle: Record<string, string> = {
+  entryexpense: "Gasto",
+  entryincome: "Recebimento",
   income: "Receita prevista",
   expense: "Conta prevista",
   installments: "Compra parcelada",
@@ -366,9 +387,16 @@ const proposalTitle: Record<string, string> = {
   recurringexpense: "Conta mensal",
 };
 
+function proposalIcon(action: ProposedAction): IconName {
+  if (action.type === "installments") return "card";
+  if (action.type === "recurring") return "repeat";
+  return action.flow === "income" ? "arrowDown" : "receipt";
+}
+
 function ProposalCard({
   proposal,
   cards,
+  accounts,
   saving,
   onChange,
   onConfirm,
@@ -376,20 +404,21 @@ function ProposalCard({
 }: {
   proposal: Proposal;
   cards: Card[];
+  accounts: Account[];
   saving: boolean;
   onChange: (change: Partial<ProposedAction>) => void;
   onConfirm: () => void;
   onDiscard: () => void;
 }) {
   const { action, status } = proposal;
-  const title =
-    action.type === "once" ? proposalTitle[action.flow] : action.type === "installments" ? proposalTitle.installments : proposalTitle[`recurring${action.flow}`];
+  const title = action.type === "installments" ? proposalTitle.installments
+    : proposalTitle[`${action.type === "once" ? "" : action.type}${action.flow}`];
   const amount = action.type === "installments" ? action.total : action.amount;
   if (status !== "pending") {
     return (
       <p className={`assistant-card assistant-proposal-done ${status}`}>
         <Icon name={status === "saved" ? "check" : "close"} size={16} />
-        {title}: {action.description} · {money(amount)} {status === "saved" ? "cadastrada" : "descartada"}
+        {status === "saved" ? "Cadastrado" : "Descartado"}: {title.toLowerCase()} {action.description} · {money(amount)}
       </p>
     );
   }
@@ -404,7 +433,7 @@ function ProposalCard({
       }}
     >
       <header>
-        <Icon name={action.type === "installments" ? "card" : action.type === "recurring" ? "repeat" : action.type === "once" && action.flow === "income" ? "arrowDown" : "receipt"} size={17} />
+        <Icon name={proposalIcon(action)} size={17} />
         <strong>{title}</strong>
         <small>confira e confirme</small>
       </header>
@@ -416,8 +445,20 @@ function ProposalCard({
           value={amount}
           onValueChange={(cents) => onChange(action.type === "installments" ? { total: cents ?? 0 } : { amount: cents ?? 0 })}
         />
-        {action.type === "once" && (
+        {(action.type === "once" || action.type === "entry") && (
           <Field label="Data" type="date" value={action.date} onChange={(event) => onChange({ date: event.target.value })} />
+        )}
+        {action.type === "entry" && (
+          <>
+            <Field label="Categoria" value={action.category} onChange={(event) => onChange({ category: event.target.value })} maxLength={40} />
+            <Field label={action.flow === "income" ? "Entrou em" : "Pago com"}>
+              <Select value={action.payWith} onChange={(event) => onChange({ payWith: event.target.value })}>
+                <option value="">Sem conta definida</option>
+                {action.flow === "expense" && cards.map((card) => <option key={card.id} value={`card:${card.id}`}>{cardLabel(card.name)}</option>)}
+                {accounts.map((account) => <option key={account.id} value={`account:${account.id}`}>{account.name}</option>)}
+              </Select>
+            </Field>
+          </>
         )}
         {action.type === "recurring" && (
           <>

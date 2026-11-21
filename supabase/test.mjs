@@ -196,12 +196,29 @@ await assert.rejects(() => db.query("select * from public.notification_log"));
 await assert.rejects(() => db.query("select * from public.notification_spending('2026-03-01', array[$1::uuid])", [owner]));
 await db.query("insert into public.category_budgets(category,amount_cents) values ('Transporte',20000)");
 await assert.rejects(() => db.query("insert into public.category_budgets(category,amount_cents) values ('Lazer',0)"));
+await assert.rejects(() => db.query("select public.monthly_summary_inputs('2026-03-01')"));
 await db.exec('reset role');
 // The Worker (service role, no RLS) sums the month's confirmed spending per category.
 const spending = (await db.query("select category, spent from public.notification_spending('2026-03-01', array[$1::uuid]) order by category", [owner])).rows;
 assert.ok(spending.some((row) => row.category === 'Mobilidade' && Number(row.spent) === 1500));
 await db.query("insert into public.notification_log(user_id,kind,ref) values ($1,'bill_due','luz')", [owner]);
 await assert.rejects(() => db.query("insert into public.notification_log(user_id,kind,ref) values ($1,'bill_due','luz')", [owner]));
+// Monthly summary: the Worker reads the month's totals and writes the summary; the owner reads and dismisses.
+await db.query("insert into public.monthly_goals(user_id,month,amount_cents) values ($1,'2026-03-01',1000)", [owner]);
+const [inputs] = (await db.query("select public.monthly_summary_inputs('2026-03-01', array[$1::uuid]) as v", [owner])).rows[0].v;
+assert.equal(inputs.user_id, owner);
+assert.equal(Number(inputs.expenses), 6000);
+assert.equal(Number(inputs.goal), 1000);
+assert.ok(inputs.categories.some((row) => row.category === 'Transporte' && Number(row.amount) === 1500));
+assert.equal(Number(inputs.largest.amount), 1500);
+await db.query("insert into public.monthly_summaries(user_id,month,numbers,text) values ($1,'2026-03-01','{\"balance\":-6000}','Mês de ajustes.')", [owner]);
+assert.deepEqual((await db.query("select public.monthly_summary_inputs('2026-03-01', null) as v")).rows[0].v, []);
+await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false); set role authenticated;`);
+assert.equal((await db.query("select text from public.monthly_summaries")).rows[0].text, 'Mês de ajustes.');
+await db.query("update public.monthly_summaries set dismissed_at=now() where month='2026-03-01'");
+await assert.rejects(() => db.query("update public.monthly_summaries set text='Inventado.'"));
+await assert.rejects(() => db.query("insert into public.monthly_summaries(user_id,month,numbers,text) values ($1,'2026-04-01','{}','x')", [owner]));
+await db.exec('reset role');
 const other='00000000-0000-0000-0000-000000000002';
 await db.query('insert into auth.users(id) values ($1)',[other]);
 await db.exec(`select set_config('request.jwt.claim.sub','${other}',false); set role authenticated;`);
@@ -209,6 +226,7 @@ assert.equal((await db.query('select * from public.transactions')).rows.length,0
 assert.equal((await db.query('select * from public.category_rules')).rows.length,0);
 assert.equal((await db.query('select * from public.push_subscriptions')).rows.length,0);
 assert.equal((await db.query('select * from public.category_budgets')).rows.length,0);
+assert.equal((await db.query('select * from public.monthly_summaries')).rows.length,0);
 assert.deepEqual((await db.query('update public.push_subscriptions set preferences=$1 returning id', ['{}'])).rows, []);
 const otherPlanning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;
 assert.deepEqual(otherPlanning,{budget:0,targets:[],valuations:[]});

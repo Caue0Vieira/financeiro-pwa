@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { AnalysisPeriod, Dashboard, FinanceService, SpendingAnalysis } from "../../contracts";
+import type { AnalysisPeriod, Dashboard, FinanceService, SpendingAnalysis, Summaries } from "../../contracts";
 import { currentMonth, dateInMonth, shiftMonth, todayInSaoPaulo } from "../../date";
 import { Icon, categoryAppearance } from "../components/common";
 import { AnalyticsSkeleton } from "../components/Skeleton";
+import { SummaryHistory } from "../components/SummaryCard";
 import { dateLabel, money, monthName } from "../format";
 
 const periods = [
@@ -18,7 +19,9 @@ export default function Analytics({
   analyze,
   revision,
   onViewTransactions,
+  summaries,
 }: {
+  summaries?: Summaries;
   month: string;
   analyze: FinanceService["analysis"];
   revision: Dashboard;
@@ -174,6 +177,7 @@ export default function Analytics({
           </section>
         </div>
       )}
+      {summaries && <SummaryHistory summaries={summaries} />}
     </>
   );
 }

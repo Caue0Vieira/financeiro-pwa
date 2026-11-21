@@ -537,3 +537,30 @@
 .category-limit-head [data-level="near"] { color: var(--warning); font-weight: 700; }
 .category-limit-head [data-level="over"] { color: var(--danger); font-weight: 700; }
 .category-limit-list small { color: var(--muted); font-size: .8rem; }
+
+/* ——— Resumo mensal (painel e Análise) ——— */
+.summary-card .panel-head p { margin: 0 0 2px; font-size: .78rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--accent); }
+.summary-card h2::first-letter, .summary-entry summary strong::first-letter { text-transform: uppercase; }
+.summary-text { margin: 4px 0 12px; line-height: 1.55; font-size: .92rem; }
+.summary-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 12px; }
+.summary-totals div { padding: 9px 8px; border-radius: 14px; background: var(--accent-soft); min-width: 0; }
+.summary-totals dt { color: var(--muted); font-size: .72rem; }
+.summary-totals dd { margin: 2px 0 0; font-weight: 700; font-size: clamp(.72rem, 3.4vw, .88rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.summary-totals .negative, .summary-entry .negative { color: var(--danger); }
+.summary-block h3 { margin: 0 0 6px; font-size: .84rem; }
+.summary-block ul { display: grid; gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.summary-block li { display: flex; justify-content: space-between; gap: 10px; font-size: .86rem; }
+.summary-block li strong { color: var(--danger); }
+.summary-facts { display: grid; gap: 6px; margin-bottom: 8px; }
+.summary-facts p { margin: 0; font-size: .86rem; line-height: 1.45; color: var(--muted); }
+.summary-facts svg { display: inline-block; color: var(--accent); vertical-align: -3px; margin-right: 6px; }
+.summary-facts .text-button { margin-left: 6px; }
+.summary-history { margin-top: 16px; }
+.summary-missing { font-size: .88rem; color: var(--muted); }
+.summary-entry { border-top: 1px solid var(--line); }
+.summary-entry > summary { display: flex; align-items: center; gap: 10px; padding: 12px 2px; cursor: pointer; list-style: none; }
+.summary-entry > summary::-webkit-details-marker { display: none; }
+.summary-entry > summary strong { flex: 1; }
+.summary-entry > summary svg { color: var(--muted); transition: transform .2s ease; }
+.summary-entry[open] > summary svg { transform: rotate(90deg); }
+.summary-entry > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 10px; }

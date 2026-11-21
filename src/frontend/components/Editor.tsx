@@ -147,6 +147,7 @@ export default function Editor({
   const titles: Record<string, string> = {
     entry: item ? "Editar lançamento" : "Novo lançamento",
     budget: "Editar orçamento",
+    goal: "Meta de economia do mês",
     "category-budget": item && type === "category-budget" ? `Limite de ${item.category}` : "Novo limite por categoria",
     target: item ? "Editar meta financeira" : "Nova meta financeira",
     contribution: "Registrar aporte",
@@ -194,6 +195,7 @@ export default function Editor({
         },
       });
     } else if (type === "budget") void mutate({ type: "saveBudget", month, amount: cents(f, "amount") });
+    else if (type === "goal") void mutate({ type: "saveGoal", month, amount: cents(f, "amount") });
     else if (type === "category-budget")
       void mutate({ type: "saveCategoryBudget", category: item?.category ?? read(f, "category"), amount: cents(f, "amount") });
     else if (type === "target")
@@ -284,6 +286,19 @@ export default function Editor({
               required
               full
             />
+          )}
+          {type === "goal" && (
+            <>
+              <MoneyField
+                label="Quanto guardar neste mês (R$)"
+                name="amount"
+                min={0}
+                defaultValue={amount(data.goal || undefined)}
+                required
+                full
+              />
+              <p className="form-hint full">O resumo mensal mostra se a sobra do mês (entradas menos saídas) chegou à meta.</p>
+            </>
           )}
           {type === "category-budget" && (
             <>

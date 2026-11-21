@@ -13,6 +13,7 @@ const switches: { key: Exclude<keyof PushPreferences, "largeExpenseMin">; label:
   { key: "invoiceClosing", label: "Fatura fechando", detail: "Dois dias antes do fechamento de cada cartão." },
   { key: "largeExpense", label: "Gasto alto", detail: "Compras pelo Open Finance a partir do valor escolhido." },
   { key: "budget", label: "Orçamento", detail: "Quando uma categoria ou o mês chega a 80% e a 100% do limite." },
+  { key: "monthlySummary", label: "Resumo mensal", detail: "No dia 1, quando o resumo do mês anterior fica pronto." },
 ];
 
 /** Profile → Notificações: turns Web Push on for this device and picks the notices it gets. */

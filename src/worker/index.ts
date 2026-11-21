@@ -7,6 +7,9 @@ import { mapTransaction, purchasesAreNegative } from "./mapping";
 import { PluggyError, pluggyClient, tokenHeader, validSignature, validToken, type Pluggy } from "./pluggy";
 import { deleteTransactions, syncItem } from "./sync";
 import { pruneLog, runNotices, saoPauloClock, SubrequestBudget } from "./notifications";
+import { generateSummaries } from "./summaries";
+import { summaryFrom } from "../summary";
+import { shiftMonth } from "../date";
 import { knownPushService } from "../notices";
 import { sendPush, type VapidKeys } from "./webpush";
 
@@ -296,19 +299,54 @@ async function notifyLargeExpenses(env: Env, userId: string) {
 async function scheduledWork(env: Env, now: Date) {
   const pluggyReady = configured(env);
   const keys = vapidKeys(env);
-  const { hour } = saoPauloClock(now);
-  if (keys && pushConfigured(env) && (hour % 2 === 1 || !pluggyReady)) {
+  const { hour, date } = saoPauloClock(now);
+  // Whether this run already spent its subrequests on summaries or notices.
+  let busy = false;
+  if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && (hour % 2 === 1 || !pluggyReady)) {
     const budget = new SubrequestBudget(45);
     const db = database(env, budget.fetch);
-    const result = await runNotices(db, budget, keys, { now })
-      .catch((error) => {
-        console.error("scheduled push", error);
-        return { idle: false };
-      });
-    if (hour === 21 && !result.idle) await pruneLog(db, now);
-    if (!(pluggyReady && result.idle)) return;
+    // Day 1 (with days 2 and 3 to catch up): last month's summary; only missing ones are created.
+    if (Number(date.slice(8, 10)) <= 3 && hour >= 9) {
+      const created = await generateSummaries(db, env.AI, shiftMonth(date.slice(0, 7), -1))
+        .catch((error) => {
+          console.error("scheduled summaries", error);
+          return [];
+        });
+      busy ||= created.length > 0;
+    }
+    if (keys) {
+      const result = await runNotices(db, budget, keys, { now })
+        .catch((error) => {
+          console.error("scheduled push", error);
+          return { idle: false };
+        });
+      busy ||= !result.idle;
+      if (hour === 21 && !result.idle) await pruneLog(db, now);
+    }
   }
-  if (pluggyReady) await syncStalestItem(servicesFor(env));
+  if (pluggyReady && !busy) await syncStalestItem(servicesFor(env));
+}
+
+/**
+ * POST /api/summary: last month's summary for the signed-in user, created now when missing (the
+ * cron makes it on day 1; this covers the first month and a failed run).
+ */
+async function summaryNow(env: Env, request: Request) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Resumo ainda não configurado no servidor." }, 503);
+  try {
+    const db = database(env);
+    const userId = await signedInUser({ db }, request);
+    const month = shiftMonth(saoPauloClock(new Date()).date.slice(0, 7), -1);
+    await generateSummaries(db, env.AI, month, userId);
+    const { data, error } = await db.from("monthly_summaries").select("month, numbers, text, dismissed_at")
+      .eq("user_id", userId).eq("month", `${month}-01`).maybeSingle();
+    if (error) throw error;
+    return json({ summary: data ? summaryFrom(data) : null });
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    console.error("/api/summary", error);
+    return json({ error: "Não foi possível gerar o resumo. Tente de novo." }, 502);
+  }
 }
 
 const pushUnavailable = () => json({ error: "Notificações ainda não configuradas no servidor." }, 503);
@@ -395,6 +433,7 @@ export default {
     // Push needs Supabase and the VAPID keys, not Pluggy.
     if (pathname === "/api/push/key" && request.method === "GET") return pushKey(env);
     if (pathname === "/api/push/test" && request.method === "POST") return await pushTest(env, request);
+    if (pathname === "/api/summary" && request.method === "POST") return await summaryNow(env, request);
     if (!configured(env)) {
       return json({ error: "Open Finance ainda não configurado no servidor." }, 503);
     }

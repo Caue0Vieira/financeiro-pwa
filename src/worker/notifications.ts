@@ -7,6 +7,7 @@ import {
   normalizePreferences, preferenceOf, wants, type Notice, type NoticeItem, type NoticeKind,
 } from "../notices.ts";
 import { sendPush, type PushResult, type VapidKeys } from "./webpush.ts";
+import { monthOnly } from "../summary.ts";
 
 /**
  * Sends the push notices (cron and webhook). Everything is loaded for all subscribed users at
@@ -156,6 +157,18 @@ export async function loadItems(db: SupabaseClient, devices: Device[], kinds: No
       add(userId, largeExpenses(list.map((row) => ({
         id: row.id, description: row.description, amount: Number(row.amount_cents), date: row.occurred_on,
       })), min));
+    }
+  }
+
+  if (kinds.includes("monthly_summary") && usersWanting("monthly_summary").length) {
+    // Summaries of last month created in the last three days (generated on day 1).
+    const last = shiftMonth(month, -1);
+    const rows = await db.from("monthly_summaries").select("user_id, month")
+      .in("user_id", usersWanting("monthly_summary")).eq("month", first(last))
+      .gte("created_at", new Date(now.getTime() - 3 * 86_400_000).toISOString());
+    fail(rows.error);
+    for (const row of rows.data ?? []) {
+      add(row.user_id, [{ kind: "monthly_summary", ref: last, label: monthOnly(last), amount: 0 }]);
     }
   }
 

@@ -81,6 +81,10 @@ npx cf workers secrets update VAPID_PRIVATE_KEY --worker financeiro-pwa
 
 O cron de hora em hora reveza o trabalho por causa do limite de 50 subrequisições do plano gratuito: nas horas pares (horário de Brasília) faz o backup do webhook da Pluggy e nas ímpares envia os avisos, entre 7h e 22h. Sem nenhum aparelho inscrito, o sync roda em todas as horas. O gasto alto também é avisado logo depois do webhook da Pluggy.
 
+### Resumo mensal
+
+No dia 1, a partir das 9h, o cron gera o resumo do mês anterior de cada usuário com lançamentos (com os dias 2 e 3 de reserva, se algo falhar): entradas, saídas, saldo, as 3 categorias que mais cresceram, a meta de economia do mês (definida pelo cartão do resumo) e o maior gasto. Os números vêm de [src/summary.ts](src/summary.ts); o Workers AI só escreve um comentário curto e, se a resposta trouxer qualquer número, o app usa um texto próprio. O resumo aparece como cartão no painel, fica no histórico em **Orçamento e Análise → Análise** e chega como push. Aplique a migração [20261121140000_monthly_summaries.sql](supabase/migrations/20261121140000_monthly_summaries.sql); não há segredo novo.
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

@@ -7,7 +7,7 @@ import { chargeDate } from './recurring.ts';
  * shared by the Worker (which sends them from the cron) and the tests; no I/O here.
  */
 
-export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget';
+export type NoticeKind = 'bill_due' | 'invoice_closing' | 'large_expense' | 'budget' | 'monthly_summary';
 
 export const defaultPreferences: PushPreferences = {
   billDue: true,
@@ -15,6 +15,7 @@ export const defaultPreferences: PushPreferences = {
   largeExpense: true,
   largeExpenseMin: 50000,
   budget: true,
+  monthlySummary: true,
 };
 
 /** Fills what a stored (or older) preferences object lacks; ignores anything unexpected. */
@@ -29,6 +30,7 @@ export function normalizePreferences(value: unknown): PushPreferences {
     largeExpense: flag('largeExpense'),
     largeExpenseMin: min >= 100 && min <= 100_000_000 ? min : defaultPreferences.largeExpenseMin,
     budget: flag('budget'),
+    monthlySummary: flag('monthlySummary'),
   };
 }
 
@@ -38,6 +40,7 @@ export const preferenceOf: Record<NoticeKind, keyof PushPreferences> = {
   invoice_closing: 'invoiceClosing',
   large_expense: 'largeExpense',
   budget: 'budget',
+  monthly_summary: 'monthlySummary',
 };
 
 /** Hours (São Paulo) each kind may be sent; outside them it waits for the next run. */
@@ -46,6 +49,7 @@ const sendingHours: Record<NoticeKind, [number, number]> = {
   invoice_closing: [9, 21],
   large_expense: [7, 22],
   budget: [8, 22],
+  monthly_summary: [9, 21],
 };
 export const dueKinds = (hour: number) =>
   (Object.keys(sendingHours) as NoticeKind[]).filter((kind) => hour >= sendingHours[kind][0] && hour <= sendingHours[kind][1]);
@@ -220,6 +224,15 @@ export function composeNotices(items: NoticeItem[]): Notice[] {
       body: shown.length === 1
         ? `${money(first.amount)} de ${money(first.limit!)} no mês.`
         : list(shown.map(({ label, amount, limit }) => `${label} ${Math.round((amount / limit!) * 100)}%`)) + '.',
+    });
+  }
+  const summaries = byKind('monthly_summary');
+  if (summaries.length) {
+    const [latest] = summaries;
+    notices.push({
+      kind: 'monthly_summary', refs: summaries.map(({ ref }) => ref), tag: 'resumo-mensal', url: screenUrl('home'),
+      title: `Seu resumo de ${latest.label} chegou`,
+      body: 'Veja entradas, saídas, o que mais cresceu e se a meta foi batida.',
     });
   }
   return notices;

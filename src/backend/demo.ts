@@ -1,5 +1,6 @@
-import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, Profile, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
 import { normalizePreferences } from '../notices.ts';
+import { buildSummary, fallbackText } from '../summary.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -23,7 +24,9 @@ export function createDemoService(): FinanceService {
     { id: 'musica', description: 'Spotify', amount: -2190, kind: 'expense', category: 'Assinaturas', startMonth: month, day: 12, cardId: 'cartao' },
   ];
   const profile: Profile = { name: 'Ayesha Khan' };
-  const goals = new Map<string, number>([[month, 90000]]);
+  const goals = new Map<string, number>([[month, 90000], [shiftMonth(month, -1), 90000]]);
+  /** Months whose summary card was dismissed. */
+  const dismissedSummaries = new Set<string>();
   const budgets = new Map<string, number>([[month, 200000]]);
   /** Category limits (same every month), by category name. */
   const categoryBudgets = new Map<string, number>([['Alimentação', 60000], ['Assinaturas', 20000]]);
@@ -141,6 +144,26 @@ export function createDemoService(): FinanceService {
     return { all, confirmed, income, expenses };
   }
 
+  /** Same numbers the Worker computes; the comment is the app's own (no AI in the demo). */
+  function summaryOf(period: string): MonthlySummary | null {
+    const confirmed = (target: string) => entries.filter((entry) => entry.status === 'confirmed' && entry.date.slice(0, 7) === target);
+    const current = confirmed(period);
+    if (!current.length) return null;
+    const spending = (list: Entry[]) => list.filter(isExpense).map(({ category, amount }) => ({ category, amount: -amount }));
+    const [largest] = current.filter((entry) => entry.kind === 'expense').sort((a, b) => a.amount - b.amount);
+    const numbers = buildSummary({
+      month: period,
+      income: current.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + entry.amount, 0),
+      expenses: -current.filter(isExpense).reduce((sum, entry) => sum + entry.amount, 0),
+      categories: spending(current),
+      previous: spending(confirmed(shiftMonth(period, -1))),
+      goal: goals.get(period) ?? 0,
+      largest: largest ? { description: largest.description, amount: -largest.amount, date: largest.date } : null,
+    });
+    return { ...numbers, month: period, text: fallbackText(numbers, period), dismissed: dismissedSummaries.has(period) };
+  }
+  const lastMonth = () => shiftMonth(currentMonth(), -1);
+
   return {
     async session() { return { email: 'demo@example.test' }; },
     onSessionChange() { return () => {}; },
@@ -186,6 +209,7 @@ export function createDemoService(): FinanceService {
         categories: Array.from(categoryTotals, ([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
         accounts: [...accounts], cards: [...cards], investments: [...investments], recurrences: [...recurrences],
         invoices: monthInvoices, coverage: coverage.filter((item) => item.month === period),
+        summary: dismissedSummaries.has(lastMonth()) ? null : summaryOf(lastMonth()),
         categoryBudgets: [...categoryBudgets].map(([category, amount]) => ({ category, amount }))
           .sort((a, b) => a.category.localeCompare(b.category, 'pt-BR')),
       };
@@ -390,6 +414,13 @@ export function createDemoService(): FinanceService {
     async changePassword() { throw new Error('A senha fica disponível na sua conta autenticada.'); },
     assistant: demoAssistant,
     push: demoPush(),
+    summaries: {
+      async list() {
+        return [1, 2, 3].map((back) => summaryOf(shiftMonth(currentMonth(), -back))).filter((item) => item !== null);
+      },
+      async dismiss(period) { dismissedSummaries.add(period); },
+      async generate() { return summaryOf(lastMonth()); },
+    },
   };
 }
 

@@ -1,6 +1,6 @@
 import { animate, motion, useMotionValue, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import type { Dashboard, FinanceService } from "../../contracts";
+import type { Dashboard, FinanceService, Summaries } from "../../contracts";
 import { HeaderMenu, PageHeading } from "../components/common";
 import { iosSpring } from "../motion/liquid";
 import type { OpenEditor } from "../types";
@@ -37,7 +37,11 @@ export default function Planning({
   analyze,
   openEditor,
   onViewTransactions,
+  initialTab = "budget",
+  summaries,
 }: {
+  initialTab?: Tab;
+  summaries?: Summaries;
   data: Dashboard;
   monthControl: ReactNode;
   analyze: FinanceService["analysis"];
@@ -46,8 +50,8 @@ export default function Planning({
 }) {
   const id = useId();
   const reduceMotion = useReducedMotion();
-  const [selected, setSelected] = useState<Tab>("budget");
-  const [openedAnalytics, setOpenedAnalytics] = useState(false);
+  const [selected, setSelected] = useState<Tab>(initialTab);
+  const [openedAnalytics, setOpenedAnalytics] = useState(initialTab === "analytics");
   const [moving, setMoving] = useState(false);
   const tabButtons = useRef<Record<Tab, HTMLButtonElement | null>>({ budget: null, analytics: null });
   const track = useRef<HTMLDivElement>(null);
@@ -285,6 +289,7 @@ export default function Planning({
                   month={data.month}
                   revision={data}
                   analyze={analyze}
+                  summaries={summaries}
                   onViewTransactions={onViewTransactions}
                 />
               )}

@@ -19,7 +19,7 @@ test("preferences fill defaults and ignore junk", () => {
 test("notices wait for daytime in São Paulo", () => {
   assert.deepEqual(dueKinds(3), []);
   assert.deepEqual(dueKinds(7), ["large_expense"]);
-  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense"]);
+  assert.deepEqual(dueKinds(9).sort(), ["bill_due", "budget", "invoice_closing", "large_expense", "monthly_summary"]);
   assert.deepEqual(dueKinds(22).sort(), ["budget", "large_expense"]);
 });
 
@@ -101,6 +101,9 @@ test("composed notices: one per kind, in Portuguese, opening the right screen", 
   assert.equal(plain(budget.body), "R$ 610,00 de R$ 600,00 no mês.");
   assert.deepEqual(budget.refs, ["alimentacao:2026-11:80", "alimentacao:2026-11:100"]);
   assert.equal(composeNotices([]).length, 0);
+  const [summary] = composeNotices([{ kind: "monthly_summary", ref: "2026-10", label: "outubro", amount: 0 }]);
+  assert.equal(summary.title, "Seu resumo de outubro chegou");
+  assert.equal(summary.url, "/?abrir=home");
 });
 
 test("a device only gets what it wants", () => {

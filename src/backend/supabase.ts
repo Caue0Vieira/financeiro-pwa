@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
-import { invoiceDates, todayInSaoPaulo } from "../date";
+import { currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
 import { normalizePreferences } from "../notices";
+import { summaryFrom } from "../summary";
 import type {
   Assistant,
   BankConnections,
@@ -12,6 +13,8 @@ import type {
   Dashboard,
   Action,
   PushNotifications,
+  Summaries,
+  MonthlySummary,
   Session,
   SavingsTarget,
   Valuation,
@@ -178,11 +181,25 @@ export function createSupabaseService(
     },
     test: (endpoint) => api<void>("/api/push/test", "POST", { endpoint }),
   };
+  const summaryColumns = "month, numbers, text, dismissed_at";
+  const summaries: Summaries = {
+    async list() {
+      const { data, error } = await db.from("monthly_summaries").select(summaryColumns).order("month", { ascending: false }).limit(24);
+      fail(error);
+      return (data ?? []).map(summaryFrom);
+    },
+    async dismiss(month) {
+      const { error } = await db.from("monthly_summaries").update({ dismissed_at: new Date().toISOString() }).eq("month", first(month));
+      fail(error);
+    },
+    generate: () => api<{ summary: MonthlySummary | null }>("/api/summary").then((result) => result.summary),
+  };
   return {
     session,
     bankConnections,
     assistant,
     push,
+    summaries,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),
@@ -473,11 +490,13 @@ export function createSupabaseService(
       return summarizeSpending(rows, window, period);
     },
     async dashboard(month): Promise<Dashboard> {
-      const [{ data, error }, planning, adjustedDates, categoryLimits] = await Promise.all([
+      const [{ data, error }, planning, adjustedDates, categoryLimits, lastSummary] = await Promise.all([
         db.rpc("monthly_dashboard", { p_month: first(month) }),
         db.rpc("nitido_planning", { p_month: first(month) }),
         db.from("card_invoice_dates").select("card_id, closing_on, due_on").eq("month", first(month)),
         db.from("category_budgets").select("category, amount_cents").order("category"),
+        db.from("monthly_summaries").select(summaryColumns)
+          .eq("month", first(shiftMonth(currentMonth(), -1))).is("dismissed_at", null).maybeSingle(),
       ]);
       fail(error);
       fail(planning.error);
@@ -706,6 +725,8 @@ export function createSupabaseService(
         categoryBudgets: (categoryLimits.error ? [] : categoryLimits.data ?? []).map((x) => ({
           category: x.category, amount: Number(x.amount_cents),
         })),
+        // Until the monthly_summaries migration is applied there is no summary card.
+        summary: lastSummary.error || !lastSummary.data ? null : summaryFrom(lastSummary.data),
         coverage: batches
           .filter((x) => x.coverage_start && x.coverage_end)
           .map((x) => ({ month, from: x.coverage_start, to: x.coverage_end })),

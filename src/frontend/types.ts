@@ -26,6 +26,7 @@ export type EditModal =
   | { type: "card-picker" }
   | { type: "commitment"; mode?: CommitmentMode }
   | { type: "budget"; item?: never }
+  | { type: "goal"; item?: never }
   | { type: "category-budget"; item?: CategoryBudget };
 
 /** Kind of commitment opened on its own screen from "Contas a pagar". */
@@ -37,5 +38,5 @@ export type OpenEditor = (modal: EditModal) => void;
 
 export type FinanceCommands = Pick<
   FinanceService,
-  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "assistant" | "push"
+  "history" | "mutate" | "confirmImport" | "saveProfile" | "changePassword" | "dashboard" | "analysis" | "bankConnections" | "assistant" | "push" | "summaries"
 > & { refresh: () => Promise<void> };

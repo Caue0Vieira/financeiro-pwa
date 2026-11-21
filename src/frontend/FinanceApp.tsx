@@ -72,6 +72,8 @@ export default function FinanceApp({
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [activityMonth, setActivityMonth] = useState(data.month);
   const [commitmentView, setCommitmentView] = useState<CommitmentView>("fixed");
+  /** Tab Orçamento e Análise opens on (the summary card goes straight to Análise). */
+  const [planningTab, setPlanningTab] = useState<"budget" | "analytics">("budget");
   const trail = useRef<Page[]>([]);
   const [modal, setModal] = useState<EditModal>();
   const [notice, setNotice] = useState<Notice>();
@@ -147,6 +149,7 @@ export default function FinanceApp({
   function navigate(next: Page, filter: ActivityFilter = "all") {
     if (page === next) return;
     if (next === "home") trail.current = [];
+    if (next === "analytics") setPlanningTab("budget");
     else trail.current.push(page);
     moveFocus.current = true;
     setNotice(undefined);
@@ -219,6 +222,20 @@ export default function FinanceApp({
         navigate={navigate}
         balanceVisible={balanceVisible}
         onToggleBalance={() => setBalanceVisible((visible) => !visible)}
+        onDismissSummary={(summaryMonth) => {
+          void (async () => {
+            try {
+              await commands.summaries?.dismiss(summaryMonth);
+              await commands.refresh();
+            } catch {
+              showNotice("Não foi possível dispensar o resumo. Tente de novo.", "error");
+            }
+          })();
+        }}
+        onSummaryHistory={() => {
+          navigate("analytics");
+          setPlanningTab("analytics");
+        }}
       />
     ),
     activity: (
@@ -235,6 +252,9 @@ export default function FinanceApp({
     ),
     analytics: (
       <Planning
+        key={planningTab}
+        initialTab={planningTab}
+        summaries={commands.summaries}
         data={data}
         monthControl={monthControl}
         analyze={commands.analysis}

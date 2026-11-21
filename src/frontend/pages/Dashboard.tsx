@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { Dashboard as DashboardData } from "../../contracts";
 import { Avatar, Entries, EntryRow, Icon, type IconName } from "../components/common";
 import { HomeCardArt } from "../components/HomeCardArt";
+import { SummaryCard } from "../components/SummaryCard";
 import { addDays, todayInSaoPaulo } from "../../date";
 import { dateLabel, money } from "../format";
 import type { OpenEditor, Page } from "../types";
@@ -14,6 +15,8 @@ export default function Dashboard({
   navigate,
   balanceVisible,
   onToggleBalance,
+  onDismissSummary,
+  onSummaryHistory,
 }: {
   data: DashboardData;
   monthControl: ReactNode;
@@ -22,6 +25,8 @@ export default function Dashboard({
   navigate: (page: Page) => void;
   balanceVisible: boolean;
   onToggleBalance: () => void;
+  onDismissSummary: (month: string) => void;
+  onSummaryHistory: () => void;
 }) {
   const name = data.profile.name.trim();
   const hour = Number(
@@ -123,6 +128,14 @@ export default function Dashboard({
           </button>
         </section>
         <div className="screen-stack home-main-stack">
+          {data.summary && !data.summary.dismissed && (
+            <SummaryCard
+              summary={data.summary}
+              onDismiss={() => onDismissSummary(data.summary!.month)}
+              onHistory={onSummaryHistory}
+              onSetGoal={() => openEditor({ type: "goal" })}
+            />
+          )}
           {invoiceReminders}
           <section className="panel recent-panel screen-list">
             <header className="panel-head">

@@ -231,6 +231,23 @@
   font-weight: 720;
 }
 .month-switch span svg { color: var(--accent); }
+.month-switch button { touch-action: manipulation; }
+.month-pick { position: relative; display: inline-flex; align-self: stretch; align-items: center; cursor: pointer; border-radius: 10px; touch-action: manipulation; }
+.month-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  font-size: 16px; /* keeps iOS from zooming in on focus */
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.month-pick:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .button, .text-button {
   display: inline-flex;
   align-items: center;

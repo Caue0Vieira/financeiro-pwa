@@ -140,6 +140,7 @@ export default function App() {
       {error && <div role="alert" className="connection-notice">{error}</div>}
       <FinanceApp
         data={data}
+        selectedMonth={month}
         onMonth={(next) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(next)) setMonth(next); }}
         commands={commands}
         preview={Boolean(demo)}

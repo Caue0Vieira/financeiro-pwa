@@ -30,6 +30,8 @@ import { useEntrance, useSpotlight } from "./motion/liquid";
 
 type Props = {
   data: DashboardData;
+  /** Month the user picked; can be ahead of data.month while it loads. */
+  selectedMonth: string;
   onMonth: (month: string) => void;
   commands: FinanceCommands;
   importView: ReactNode;
@@ -44,6 +46,7 @@ const toastExitMs = 180;
 
 export default function FinanceApp({
   data,
+  selectedMonth,
   onMonth,
   commands,
   importView,
@@ -142,7 +145,7 @@ export default function FinanceApp({
 
   const add = () => openEditor({ type: "entry" });
   const activeCards = data.cards.filter((card) => !card.archived);
-  const monthControl = <MonthControl month={month} onMonth={onMonth} />;
+  const monthControl = <MonthControl month={selectedMonth} onMonth={onMonth} />;
   const invoiceReminders = (
     <InvoiceAlerts
       alerts={invoiceAlerts}

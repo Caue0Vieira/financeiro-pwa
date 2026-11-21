@@ -257,16 +257,40 @@ export function PageHeading({
 }
 
 export function MonthControl({ month, onMonth }: { month: string; onMonth: (month: string) => void }) {
+  // Quick taps can land before the parent re-renders with the new month,
+  // so each step starts from the last month asked for, not the prop.
+  const requested = useRef(month);
+  useEffect(() => { requested.current = month; }, [month]);
+  const step = (difference: number) => {
+    requested.current = shiftMonth(requested.current, difference);
+    onMonth(requested.current);
+  };
   return (
     <div className="month-switch">
-      <button type="button" onClick={() => onMonth(shiftMonth(month, -1))} aria-label="Mês anterior">
+      <button type="button" onClick={() => step(-1)} aria-label="Mês anterior">
         <Icon name="chevronLeft" size={17} />
       </button>
-      <span aria-live="polite">
-        <Icon name="calendar" size={16} />
-        {monthName(month)}
-      </span>
-      <button type="button" onClick={() => onMonth(shiftMonth(month, 1))} aria-label="Próximo mês">
+      <label className="month-pick">
+        <span aria-live="polite">
+          <Icon name="calendar" size={16} />
+          {monthName(month)}
+        </span>
+        {/* Invisible native month input over the label: on iPhone it opens the wheel picker. */}
+        <input
+          type="month"
+          value={month}
+          aria-label="Escolher mês"
+          onClick={(event) => {
+            try { event.currentTarget.showPicker?.(); } catch { /* the browser opens it on its own */ }
+          }}
+          onChange={(event) => {
+            if (!event.target.value) return;
+            requested.current = event.target.value;
+            onMonth(event.target.value);
+          }}
+        />
+      </label>
+      <button type="button" onClick={() => step(1)} aria-label="Próximo mês">
         <Icon name="chevronRight" size={17} />
       </button>
     </div>

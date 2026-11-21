@@ -615,3 +615,20 @@
 .export-panel form { display: grid; gap: 10px; }
 .export-panel form .button { justify-self: start; }
 .export-title { font-size: .9rem; }
+
+/* ——— Comprovantes (detalhe do lançamento) ——— */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.receipts { display: grid; gap: 10px; margin: 14px 0 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.receipts h3 { margin: 0; font-size: .9rem; }
+.receipt-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.receipt-list li { display: grid; gap: 3px; min-width: 0; }
+.receipt-list a { display: block; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--accent-soft); border: 1px solid var(--line); }
+.receipt-list a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.receipt-list img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.receipt-file { display: grid; place-items: center; align-content: center; gap: 4px; height: 100%; color: var(--accent); font-weight: 700; font-size: .78rem; }
+.receipt-name { font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.receipt-list small { color: var(--muted); font-size: .7rem; }
+.receipt-list .text-button { justify-self: start; padding: 0; font-size: .76rem; }
+.receipt-add { justify-self: start; cursor: pointer; }
+.receipt-add.disabled { opacity: .55; pointer-events: none; }
+.receipt-add:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { encodeAvatar } from "./avatar";
+import { prepareReceipt } from "./receiptFile";
 import { addDays, currentMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from "../date";
 import { spendingWindow, summarizeSpending } from "./spending";
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice, type CardDays } from "../recurring";
@@ -18,6 +19,7 @@ import type {
   Summaries,
   MonthlySummary,
   SubscriptionDetector,
+  Receipts,
   Session,
   SavingsTarget,
   Valuation,
@@ -236,6 +238,60 @@ export function createSupabaseService(
       fail(error);
     },
   };
+  /** Files in the private "receipts" bucket under the user's id; links last an hour. */
+  type ReceiptRow = { id: string; path: string; thumb_path: string | null; name: string; content_type: string; size_bytes: number; created_at: string };
+  const receiptColumns = "id, path, thumb_path, name, content_type, size_bytes, created_at";
+  const signed = async (rows: ReceiptRow[]) => {
+    if (!rows.length) return [];
+    const paths = rows.flatMap((row) => [row.path, ...(row.thumb_path ? [row.thumb_path] : [])]);
+    const { data, error } = await db.storage.from("receipts").createSignedUrls(paths, 3600);
+    fail(error);
+    const link = new Map((data ?? []).map((item) => [item.path, item.signedUrl ?? undefined]));
+    return rows.map((row) => ({
+      id: row.id, name: row.name, contentType: row.content_type, size: row.size_bytes, createdAt: row.created_at,
+      url: link.get(row.path) ?? "", thumbnailUrl: row.thumb_path ? link.get(row.thumb_path) : undefined,
+    }));
+  };
+  const removeReceiptFiles = async (column: "id" | "transaction_id", value: string) => {
+    const { data, error } = await db.from("receipts").select("path, thumb_path").eq(column, value);
+    // Without the receipts migration there is nothing to remove.
+    if (error || !data?.length) return;
+    await db.storage.from("receipts").remove(data.flatMap((row) => [row.path, ...(row.thumb_path ? [row.thumb_path] : [])]));
+  };
+  const receipts: Receipts = {
+    async list(entryId) {
+      const { data, error } = await db.from("receipts").select(receiptColumns).eq("transaction_id", entryId).order("created_at");
+      fail(error);
+      return signed((data ?? []) as ReceiptRow[]);
+    },
+    async add(entryId, file) {
+      const u = await user();
+      const prepared = await prepareReceipt(file);
+      const folder = `${u.id}/${entryId}/${crypto.randomUUID()}`;
+      const path = `${folder}.${prepared.contentType === "application/pdf" ? "pdf" : "jpg"}`;
+      const thumbPath = prepared.thumb ? `${folder}-miniatura.jpg` : null;
+      const uploaded = await db.storage.from("receipts").upload(path, prepared.main, { contentType: prepared.contentType });
+      fail(uploaded.error);
+      if (prepared.thumb && thumbPath) {
+        const thumb = await db.storage.from("receipts").upload(thumbPath, prepared.thumb, { contentType: "image/jpeg" });
+        fail(thumb.error);
+      }
+      const { data, error } = await db.from("receipts").insert({
+        transaction_id: entryId, path, thumb_path: thumbPath, name: prepared.name,
+        content_type: prepared.contentType, size_bytes: prepared.main.size,
+      }).select(receiptColumns).single();
+      if (error) {
+        await db.storage.from("receipts").remove([path, ...(thumbPath ? [thumbPath] : [])]);
+        fail(error);
+      }
+      return (await signed([data as ReceiptRow]))[0];
+    },
+    async remove(id) {
+      await removeReceiptFiles("id", id);
+      const { error } = await db.from("receipts").delete().eq("id", id);
+      fail(error);
+    },
+  };
   return {
     session,
     bankConnections,
@@ -243,6 +299,7 @@ export function createSupabaseService(
     push,
     summaries,
     subscriptions,
+    receipts,
     onSessionChange(listener) {
       const { data } = db.auth.onAuthStateChange((_event, s) =>
         listener(s?.user.email ? { email: s.user.email } : null),
@@ -381,6 +438,8 @@ export function createSupabaseService(
           break;
         }
         case "deleteEntry":
+          // The rows go with the entry (on delete cascade); the files in storage are removed here.
+          await removeReceiptFiles("transaction_id", action.id);
           await remove("transactions", action.id);
           break;
         case "saveAccount":

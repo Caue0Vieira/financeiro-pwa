@@ -211,6 +211,18 @@ assert.equal(uberGroup.charges.length, 3);
 assert.ok(!grouped.some((group) => group.description === 'Parcelas'));
 await db.query("insert into public.subscription_decisions(merchant_key,status) values ('uber trip','ignored')");
 await assert.rejects(() => db.query("insert into public.subscription_decisions(merchant_key,status) values ('netflix','talvez')"));
+// Receipts: files only under the owner's folder; rows tied to the owner's entry and gone with it.
+const receiptEntry = await learnRow('Farmácia', 'Saúde');
+const receiptPath = `${owner}/${receiptEntry}/nota.jpg`;
+await db.query("insert into storage.objects(bucket_id,name) values ('receipts',$1)", [receiptPath]);
+await assert.rejects(() => db.query("insert into storage.objects(bucket_id,name) values ('receipts','00000000-0000-0000-0000-000000000002/x.jpg')"));
+await db.query("insert into public.receipts(transaction_id,path,thumb_path,name,content_type,size_bytes) values ($1,$2,$3,'nota.jpg','image/jpeg',120000)", [receiptEntry, receiptPath, receiptPath.replace('.jpg', '-miniatura.jpg')]);
+await assert.rejects(() => db.query("insert into public.receipts(transaction_id,path,name,content_type,size_bytes) values ($1,'outro/x.jpg','x.jpg','image/jpeg',1)", [receiptEntry]));
+await assert.rejects(() => db.query("insert into public.receipts(transaction_id,path,name,content_type,size_bytes) values ($1,$2,'x.exe','application/x-msdownload',1)", [receiptEntry, `${owner}/x.exe`]));
+await assert.rejects(() => db.query("update public.receipts set name='renomeado'"));
+assert.equal((await db.query('select count(*)::int as n from public.receipts')).rows[0].n, 1);
+await db.query('delete from public.transactions where id=$1', [receiptEntry]);
+assert.equal((await db.query('select count(*)::int as n from public.receipts')).rows[0].n, 0);
 await db.exec('reset role');
 // The Worker (service role, no RLS) sums the month's confirmed spending per category.
 const spending = (await db.query("select category, spent from public.notification_spending('2026-03-01', array[$1::uuid]) order by category", [owner])).rows;
@@ -243,6 +255,7 @@ assert.equal((await db.query('select * from public.category_budgets')).rows.leng
 assert.equal((await db.query('select * from public.monthly_summaries')).rows.length,0);
 assert.equal((await db.query('select * from public.balance_forecasts')).rows.length,0);
 assert.equal((await db.query('select * from public.subscription_decisions')).rows.length,0);
+assert.equal((await db.query("select * from storage.objects where bucket_id='receipts'")).rows.length,0);
 assert.deepEqual((await db.query("select public.subscription_charges('2026-01-01') as v")).rows[0].v, []);
 assert.deepEqual((await db.query('update public.push_subscriptions set preferences=$1 returning id', ['{}'])).rows, []);
 const otherPlanning=(await db.query("select public.nitido_planning('2026-01-01') as value")).rows[0].value;

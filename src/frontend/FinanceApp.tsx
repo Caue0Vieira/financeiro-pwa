@@ -429,6 +429,7 @@ export default function FinanceApp({
             busy={busy}
             error={editorError}
             loadHistory={commands.history}
+            receipts={commands.receipts}
             close={() => {
               if (!busy) setModal(undefined);
             }}

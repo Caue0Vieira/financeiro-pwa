@@ -1,8 +1,9 @@
-import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, Receipt, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
 import { normalizePreferences } from '../notices.ts';
 import { buildSummary, fallbackText } from '../summary.ts';
 import { projectBalance } from '../forecast.ts';
 import { detectSubscriptions } from '../subscriptions.ts';
+import { prepareReceipt } from './receiptFile.ts';
 import { addDays, currentMonth, dateInMonth, invoiceDates, shiftMonth, todayInSaoPaulo } from '../date.ts';
 import { spendingWindow, summarizeSpending } from './spending.ts';
 import { chargeDate, chargeInvoiceMonth, chargesInInvoice } from '../recurring.ts';
@@ -31,6 +32,12 @@ export function createDemoService(): FinanceService {
   const dismissedSummaries = new Set<string>();
   const demoBankBalance = 82000;
   const subscriptionDecisions = new Map<string, 'confirmed' | 'ignored'>();
+  /** Receipts by entry: object URLs that live while the page is open. */
+  const receiptFiles = new Map<string, Receipt[]>();
+  const releaseReceipt = (receipt: Receipt) => {
+    URL.revokeObjectURL(receipt.url);
+    if (receipt.thumbnailUrl) URL.revokeObjectURL(receipt.thumbnailUrl);
+  };
   const budgets = new Map<string, number>([[month, 200000]]);
   /** Category limits (same every month), by category name. */
   const categoryBudgets = new Map<string, number>([['Alimentação', 60000], ['Assinaturas', 20000]]);
@@ -265,6 +272,8 @@ export function createDemoService(): FinanceService {
         case 'deleteEntry':
           if (allocations.some((item) => item.paymentId === action.id)) throw new Error('O pagamento está vinculado a uma fatura.');
           remove(entries, action.id);
+          receiptFiles.get(action.id)?.forEach(releaseReceipt);
+          receiptFiles.delete(action.id);
           return;
         case 'saveAccount':
           put(accounts, { ...action.account, id: action.account.id ?? crypto.randomUUID() });
@@ -454,6 +463,29 @@ export function createDemoService(): FinanceService {
       async decide(key, status) {
         if (status) subscriptionDecisions.set(key, status);
         else subscriptionDecisions.delete(key);
+      },
+    },
+    receipts: {
+      async list(entryId) {
+        return [...(receiptFiles.get(entryId) ?? [])];
+      },
+      async add(entryId, file) {
+        if (!entries.some(({ id }) => id === entryId)) throw new Error('Salve o lançamento antes de anexar.');
+        const prepared = await prepareReceipt(file);
+        const receipt: Receipt = {
+          id: crypto.randomUUID(), name: prepared.name, contentType: prepared.contentType, size: prepared.main.size,
+          url: URL.createObjectURL(prepared.main),
+          thumbnailUrl: prepared.thumb ? URL.createObjectURL(prepared.thumb) : undefined,
+          createdAt: new Date().toISOString(),
+        };
+        receiptFiles.set(entryId, [...(receiptFiles.get(entryId) ?? []), receipt]);
+        return receipt;
+      },
+      async remove(id) {
+        for (const [entryId, list] of receiptFiles) {
+          list.filter((item) => item.id === id).forEach(releaseReceipt);
+          receiptFiles.set(entryId, list.filter((item) => item.id !== id));
+        }
       },
     },
     summaries: {

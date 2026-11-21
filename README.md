@@ -101,6 +101,10 @@ No chat do assistente, frases como "gastei 45 no ifood ontem no nubank", "paguei
 
 Em **Perfil → Exportar dados**: a planilha CSV de qualquer período (data, descrição, valor, tipo, categoria, situação, conta ou cartão, fatura, parcela e tags; separada por `;`, com vírgula decimal, abre direto no Excel em português) e o extrato de um mês em PDF, com totais, gastos por categoria e todos os lançamentos. Os dois arquivos são gerados no aparelho ([src/frontend/exports.ts](src/frontend/exports.ts) e um gerador de PDF mínimo em [src/frontend/pdf.ts](src/frontend/pdf.ts)), sem biblioteca nem servidor.
 
+### Comprovantes
+
+Ao abrir um lançamento salvo, a seção **Comprovantes** anexa fotos ou PDFs. A foto é reduzida no aparelho antes do envio (até 1600 px, JPEG, com uma miniatura de 320 px) e o PDF vai como está, até 5 MB. Os arquivos ficam no bucket privado `receipts` do Supabase Storage, sob o prefixo do `user_id` (como o avatar), e saem junto quando o lançamento é excluído. Aplique a migração [20261121170000_receipts.sql](supabase/migrations/20261121170000_receipts.sql); ela cria o bucket e as políticas.
+
 ## Arquivos de importação
 
 - Para o extrato da conta, selecione o CSV do Inter ou um OFX bancário. Revise períodos, tipos, categorias e possíveis duplicatas.

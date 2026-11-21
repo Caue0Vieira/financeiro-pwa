@@ -138,6 +138,7 @@ export default function App() {
     push: service.push,
     summaries: service.summaries,
     subscriptions: service.subscriptions,
+    receipts: service.receipts,
     refresh,
   };
   return (

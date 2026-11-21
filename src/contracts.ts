@@ -228,6 +228,26 @@ export interface FinanceService {
   summaries?: Summaries;
   /** Recurring charges found in the history (src/subscriptions.ts) and the user's decisions. */
   subscriptions?: SubscriptionDetector;
+  /** Photos and PDFs attached to entries (private storage in the real account). */
+  receipts?: Receipts;
+}
+
+export interface Receipt {
+  id: string;
+  name: string;
+  contentType: string;
+  /** Bytes after the photo was reduced. */
+  size: number;
+  /** Short-lived link to open the file. */
+  url: string;
+  thumbnailUrl?: string;
+  createdAt: string;
+}
+export interface Receipts {
+  list(entryId: string): Promise<Receipt[]>;
+  /** Reduces a photo before uploading it; PDFs go as they are (up to 5 MB). */
+  add(entryId: string, file: File): Promise<Receipt>;
+  remove(id: string): Promise<void>;
 }
 
 export type SubscriptionStatus = 'confirmed' | 'ignored';

@@ -6,6 +6,7 @@ import type {
   EntryKind,
   FinanceService,
   Investment,
+  Receipts,
   Recurrence,
 } from "../../contracts";
 import { addDays, invoiceDates, todayInSaoPaulo } from "../../date";
@@ -14,6 +15,7 @@ import { BankIcon, bankSuggestions, findBank } from "./BankIcon";
 import { CardModelPicker } from "./HomeCardArt";
 import { Field } from "./Field";
 import { Overlay } from "./Overlay";
+import { ReceiptSection } from "./ReceiptSection";
 import { PayWithField } from "./PayWithField";
 import { Select } from "./Select";
 import MoneyField from "./MoneyField";
@@ -31,10 +33,12 @@ export default function Editor({
   busy,
   error,
   loadHistory,
+  receipts,
   close,
   mutate,
   changeModal,
 }: {
+  receipts?: Receipts;
   modal: Exclude<EditModal, { type: "commitment" | "card-picker" }>;
   data: Dashboard;
   month: string;
@@ -795,6 +799,9 @@ export default function Editor({
             </>
           )}
         </div>
+        {type === "entry" && item && receipts && !/^(recurrence|previsto):/.test(item.id) && (
+          <ReceiptSection entryId={item.id} receipts={receipts} />
+        )}
         {error && (
           <p className="inline-error" role="alert">
             {error}

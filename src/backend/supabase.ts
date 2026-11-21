@@ -219,12 +219,15 @@ export function createSupabaseService(
       const today = todayInSaoPaulo();
       const [charges, decisions] = await Promise.all([
         db.rpc("subscription_charges", { p_since: addDays(today, -lookbackDays) }),
-        db.from("subscription_decisions").select("merchant_key, status"),
+        db.from("subscription_decisions").select("merchant_key, status, updated_at"),
       ]);
       fail(charges.error);
       fail(decisions.error);
-      const decided = new Map((decisions.data ?? []).map((row) => [row.merchant_key as string, row.status]));
-      return detectSubscriptions((charges.data ?? []) as ChargeGroup[], decided, today);
+      const rows = decisions.data ?? [];
+      const decided = new Map(rows.map((row) => [row.merchant_key as string, row.status]));
+      const cancelledOn = new Map(rows.filter((row) => row.status === "cancelled")
+        .map((row) => [row.merchant_key as string, String(row.updated_at).slice(0, 10)]));
+      return detectSubscriptions((charges.data ?? []) as ChargeGroup[], decided, today, cancelledOn);
     },
     async decide(key, status) {
       if (!status) {

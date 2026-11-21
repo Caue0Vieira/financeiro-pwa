@@ -54,6 +54,8 @@ export function detectSubscriptions(
   groups: ChargeGroup[],
   decisions: Map<string, SubscriptionStatus>,
   today: string,
+  /** When each cancelled subscription was marked (YYYY-MM-DD). */
+  cancelledOn = new Map<string, string>(),
 ): DetectedSubscription[] {
   const since = addDays(today, -lookbackDays);
   const merchants = new Map<string, { description: string; charges: Charge[] }>();
@@ -76,7 +78,8 @@ export function detectSubscriptions(
     const decision = decisions.get(key);
     const series = seriesOf(charges);
     const last = series[series.length - 1];
-    let cadence = cadenceOf(series);
+    const pattern = cadenceOf(series);
+    let cadence = pattern;
     // A store bought from often (delivery, market) is not a subscription even if some charges line up.
     const others = charges.filter((charge) => charge.date >= series[0].date && !series.includes(charge)).length;
     if (others > series.length / 2) cadence = null;
@@ -84,6 +87,8 @@ export function detectSubscriptions(
     if (!recent) cadence = null;
     // Once confirmed, it stays listed while it is still charged, even if the pattern got looser.
     if (!cadence && decision === 'confirmed' && last.date >= addDays(today, -45)) cadence = 'monthly';
+    // Cancelled ones stay listed (it stopped charging, which is the point) to show what was saved.
+    if (decision === 'cancelled') cadence = pattern ?? 'monthly';
     if (!cadence) continue;
 
     const previous = series.length > 1 ? series[series.length - 2] : undefined;
@@ -104,9 +109,10 @@ export function detectSubscriptions(
       // New: it started charging in the last two months and the user hasn't decided yet.
       isNew: !decision && charges[0].date >= addDays(today, -62),
       status: decision ?? 'suggested',
+      ...(decision === 'cancelled' && { chargedAfterCancel: last.date > (cancelledOn.get(key) ?? today) }),
     });
   }
-  const order: Record<SubscriptionStatus | 'suggested', number> = { suggested: 0, confirmed: 1, ignored: 2 };
+  const order: Record<SubscriptionStatus | 'suggested', number> = { suggested: 0, confirmed: 1, cancelled: 2, ignored: 3 };
   return found.sort((a, b) => order[a.status] - order[b.status] || b.yearlyCost - a.yearlyCost || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
@@ -116,11 +122,15 @@ function displayName(description: string) {
   return text === text.toUpperCase() ? text.charAt(0) + text.slice(1).toLowerCase() : text;
 }
 
-/** Totals of what counts (everything not ignored). */
+/** Totals of what counts (neither ignored nor cancelled), and what the cancelled ones saved. */
 export function subscriptionTotals(list: DetectedSubscription[]) {
-  const active = list.filter(({ status }) => status !== 'ignored');
+  const sum = (items: DetectedSubscription[], cost: 'monthlyCost' | 'yearlyCost') =>
+    items.reduce((total, item) => total + item[cost], 0);
+  const active = list.filter(({ status }) => status !== 'ignored' && status !== 'cancelled');
+  const cancelled = list.filter(({ status }) => status === 'cancelled');
   return {
-    monthly: active.reduce((sum, item) => sum + item.monthlyCost, 0),
-    yearly: active.reduce((sum, item) => sum + item.yearlyCost, 0),
+    monthly: sum(active, 'monthlyCost'),
+    yearly: sum(active, 'yearlyCost'),
+    savedMonthly: sum(cancelled, 'monthlyCost'),
   };
 }

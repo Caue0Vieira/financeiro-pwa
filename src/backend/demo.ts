@@ -1,4 +1,4 @@
-import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, Receipt, PushNotifications, PushPreferences, Recurrence, SavingsTarget, Valuation } from '../contracts';
+import type { Account, Assistant, Card, Coverage, Dashboard, Entry, FinanceService, Investment, Invoice, MonthlySummary, Profile, Receipt, PushNotifications, PushPreferences, Recurrence, SavingsTarget, SubscriptionStatus, Valuation } from '../contracts';
 import { normalizePreferences } from '../notices.ts';
 import { buildSummary, fallbackText } from '../summary.ts';
 import { projectBalance } from '../forecast.ts';
@@ -32,7 +32,8 @@ export function createDemoService(): FinanceService {
   /** Months whose summary card was dismissed. */
   const dismissedSummaries = new Set<string>();
   const demoBankBalance = 82000;
-  const subscriptionDecisions = new Map<string, 'confirmed' | 'ignored'>();
+  const subscriptionDecisions = new Map<string, SubscriptionStatus>();
+  const cancelledOn = new Map<string, string>();
   /** Receipts by entry: object URLs that live while the page is open. */
   const receiptFiles = new Map<string, Receipt[]>();
   const releaseReceipt = (receipt: Receipt) => {
@@ -493,11 +494,14 @@ export function createDemoService(): FinanceService {
           [...groups].map(([description, charges]) => ({ description, charges })),
           subscriptionDecisions,
           todayInSaoPaulo(),
+          cancelledOn,
         );
       },
       async decide(key, status) {
         if (status) subscriptionDecisions.set(key, status);
         else subscriptionDecisions.delete(key);
+        if (status === 'cancelled') cancelledOn.set(key, todayInSaoPaulo());
+        else cancelledOn.delete(key);
       },
     },
     receipts: {

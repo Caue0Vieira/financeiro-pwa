@@ -393,11 +393,11 @@ export default function Editor({
                   <span>Previsto para {dateLabel(item.date)}</span>
                   <button
                     type="button"
-                    className="text-button"
+                    className="button secondary"
                     disabled={busy}
                     onClick={() => void mutate({ type: "saveEntry", entry: { ...item, status: "confirmed" } })}
                   >
-                    <Icon name="check" size={15} />
+                    <Icon name="check" size={16} />
                     {item.amount > 0 ? "Confirmar recebimento" : "Confirmar pagamento"}
                   </button>
                 </p>

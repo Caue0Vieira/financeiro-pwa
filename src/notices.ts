@@ -280,7 +280,7 @@ export function composeNotices(items: NoticeItem[]): Notice[] {
 export function subscriptionItems(list: DetectedSubscription[], today: string): NoticeItem[] {
   const items: NoticeItem[] = [];
   for (const item of list) {
-    if (item.status === 'ignored') continue;
+    if (item.status === 'ignored' || item.status === 'cancelled') continue;
     if (item.isNew) items.push({ kind: 'subscription', ref: `nova:${item.key}`, label: item.name, amount: item.amount });
     else if (item.priceChange > 0 && item.lastDate >= addDays(today, -10)) {
       items.push({ kind: 'subscription', ref: `preco:${item.key}:${item.lastDate}`, label: item.name, amount: item.amount, limit: item.previousAmount });

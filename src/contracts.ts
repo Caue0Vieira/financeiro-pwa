@@ -273,7 +273,7 @@ export interface Receipts {
   remove(id: string): Promise<void>;
 }
 
-export type SubscriptionStatus = 'confirmed' | 'ignored';
+export type SubscriptionStatus = 'confirmed' | 'ignored' | 'cancelled';
 export interface DetectedSubscription {
   /** Normalised merchant; decisions are stored by it. */
   key: string;
@@ -293,6 +293,8 @@ export interface DetectedSubscription {
   /** Started in the last two months and not reviewed yet. */
   isNew: boolean;
   status: SubscriptionStatus | 'suggested';
+  /** Cancelled, but charged again after the user marked it. */
+  chargedAfterCancel?: boolean;
 }
 export interface SubscriptionDetector {
   list(): Promise<DetectedSubscription[]>;

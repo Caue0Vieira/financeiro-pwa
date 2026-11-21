@@ -66,3 +66,16 @@ test("push items: new ones and recent price increases, never ignored", () => {
   const ignored = detectSubscriptions([{ description: "Google Gemini", charges: [["2026-10-04", 9699], ["2026-11-04", 9699]] }], new Map([["google gemini", "ignored"]]), today);
   assert.deepEqual(subscriptionItems(ignored, today), []);
 });
+
+test("cancelled: stays listed out of the total, and a charge after cancelling is flagged", () => {
+  const groups = [monthly("CURSOR, AI POWERED IDE", [10962, 10962, 10962], 1), monthly("Spotify", [2190, 2190, 2190])];
+  const decisions = new Map([["cursor ai", "cancelled"], ["spotify", "cancelled"]]);
+  const list = detectSubscriptions(groups, decisions, "2027-02-20", new Map([["cursor ai", "2026-11-03"], ["spotify", "2026-10-20"]]));
+  const cursor = list.find(({ key }) => key === "cursor ai");
+  const spotify = list.find(({ key }) => key === "spotify");
+  assert.equal(cursor.status, "cancelled");
+  assert.equal(cursor.chargedAfterCancel, false);
+  assert.equal(spotify.chargedAfterCancel, true);
+  assert.deepEqual(subscriptionTotals(list), { monthly: 0, yearly: 0, savedMonthly: 13152 });
+  assert.deepEqual(subscriptionItems(list, "2027-02-20"), []);
+});

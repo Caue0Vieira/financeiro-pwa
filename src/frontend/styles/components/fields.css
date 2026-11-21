@@ -105,7 +105,6 @@ input::placeholder { color: var(--muted); }
 .full { grid-column: 1 / -1; }
 .form-hint { color: var(--muted); font-size: .85rem; }
 .planned-confirm { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; color: var(--muted); font-size: .85rem; }
-.planned-confirm .text-button { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; font-size: .85rem; font-weight: 600; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 .form-details { border-top: 1px solid var(--line); }
 .form-details summary {

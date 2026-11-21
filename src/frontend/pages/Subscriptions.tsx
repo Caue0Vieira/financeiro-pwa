@@ -42,7 +42,12 @@ export default function Subscriptions({
     try {
       await detector.decide(item.key, status);
       setItems(await detector.list());
-      const outcome = { confirmed: "confirmada", ignored: "ignorada", none: "voltou para revisão" }[status ?? "none"];
+      const outcome = {
+        confirmed: "confirmada",
+        ignored: "ignorada",
+        cancelled: "marcada como cancelada; saiu do total",
+        none: "voltou para revisão",
+      }[status ?? "none"];
       showNotice(`${item.name} ${outcome}.`);
     } catch {
       showNotice(navigator.onLine ? "Não foi possível salvar. Tente de novo." : "Sem conexão. Tente quando a internet voltar.", "error");
@@ -72,7 +77,8 @@ export default function Subscriptions({
   const review = items.filter(({ status }) => status === "suggested");
   const confirmed = items.filter(({ status }) => status === "confirmed");
   const ignored = items.filter(({ status }) => status === "ignored");
-  const row = (item: DetectedSubscription) => (
+  const cancelled = items.filter(({ status }) => status === "cancelled");
+  const row = (item: DetectedSubscription) => item.status === "cancelled" ? cancelledRow(item) : (
     <li key={item.key} className="subscription-item">
       <div className="subscription-main">
         <strong>{item.name}</strong>
@@ -100,6 +106,11 @@ export default function Subscriptions({
             {item.status === "confirmed" ? "Não é assinatura" : "Ignorar"}
           </button>
         )}
+        {item.status !== "ignored" && (
+          <button type="button" className="text-button" disabled={busy === item.key} onClick={() => void decide(item, "cancelled")}>
+            Cancelei
+          </button>
+        )}
         {item.status === "ignored" && (
           <button type="button" className="text-button" disabled={busy === item.key} onClick={() => void decide(item, null)}>
             Voltar a sugerir
@@ -108,6 +119,31 @@ export default function Subscriptions({
       </div>
     </li>
   );
+  function cancelledRow(item: DetectedSubscription) {
+    return (
+      <li key={item.key} className="subscription-item">
+        <div className="subscription-main">
+          <strong>{item.name}</strong>
+          <span className="subscription-amount">{money(item.amount)} <small>{cadenceLabel[item.cadence]}</small></span>
+        </div>
+        {item.chargedAfterCancel && (
+          <div className="subscription-badges">
+            <span className="badge warning">Cobrou de novo em {dateLabel(item.lastDate)}</span>
+          </div>
+        )}
+        <p className="subscription-meta">
+          {item.chargedAfterCancel
+            ? "Confira com o serviço: a cobrança continuou depois que você marcou como cancelada."
+            : `Última cobrança em ${dateLabel(item.lastDate)}`}
+        </p>
+        <div className="subscription-actions">
+          <button type="button" className="text-button" disabled={busy === item.key} onClick={() => void decide(item, "confirmed")}>
+            Desfazer
+          </button>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <>
@@ -121,7 +157,7 @@ export default function Subscriptions({
           <span>Por ano</span>
           <strong>{money(totals.yearly)}</strong>
         </div>
-        <small>Soma das confirmadas e das sugestões; as ignoradas ficam de fora.</small>
+        <small>Soma das confirmadas e das sugestões; ignoradas e canceladas ficam de fora.</small>
       </section>
       {items.length === 0 && (
         <p className="empty">Nenhuma cobrança recorrente encontrada nos últimos 13 meses. Elas aparecem depois da segunda cobrança.</p>
@@ -137,6 +173,13 @@ export default function Subscriptions({
         <section className="panel" aria-labelledby="subscriptions-confirmed">
           <h2 id="subscriptions-confirmed">Confirmadas</h2>
           <ul className="subscription-list">{confirmed.map(row)}</ul>
+        </section>
+      )}
+      {cancelled.length > 0 && (
+        <section className="panel" aria-labelledby="subscriptions-cancelled">
+          <h2 id="subscriptions-cancelled">Canceladas</h2>
+          <p className="subtle">Fora do total: economia de {money(totals.savedMonthly)} por mês.</p>
+          <ul className="subscription-list">{cancelled.map(row)}</ul>
         </section>
       )}
       {ignored.length > 0 && (

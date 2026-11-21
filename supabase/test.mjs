@@ -220,6 +220,7 @@ assert.equal(uberGroup.charges.length, 3);
 assert.ok(!grouped.some((group) => group.description === 'Parcelas'));
 await db.query("insert into public.subscription_decisions(merchant_key,status) values ('uber trip','ignored')");
 await assert.rejects(() => db.query("insert into public.subscription_decisions(merchant_key,status) values ('netflix','talvez')"));
+await db.query("insert into public.subscription_decisions(merchant_key,status) values ('cursor','cancelled')");
 // Receipts: files only under the owner's folder; rows tied to the owner's entry and gone with it.
 const receiptEntry = await learnRow('Farmácia', 'Saúde');
 const receiptPath = `${owner}/${receiptEntry}/nota.jpg`;

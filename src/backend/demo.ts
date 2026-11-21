@@ -11,7 +11,10 @@ import { autoRecordDate, chargeDate, chargeInvoiceMonth, chargesInInvoice } from
 export function createDemoService(): FinanceService {
   const month = currentMonth();
   // As if Open Finance had brought the account balance.
-  const accounts: Account[] = [{ id: 'conta', name: 'Banco Inter', balance: 482350, balanceSyncedAt: new Date().toISOString() }];
+  const accounts: Account[] = [
+    { id: 'conta', name: 'Banco Inter', balance: 482350, balanceSyncedAt: new Date().toISOString() },
+    { id: 'reserva', name: 'Nubank', balance: 1250000, balanceSyncedAt: new Date().toISOString() },
+  ];
   const cards: Card[] = [
     { id: 'cartao', name: 'Cartão principal', accountId: 'conta', dueDay: 24, closingDay: 17, creditLimit: 800000, availableLimit: 512340, billBalance: 287660 },
   ];

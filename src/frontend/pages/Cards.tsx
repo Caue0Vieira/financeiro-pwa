@@ -90,6 +90,7 @@ export default function Cards({
           </button>
         }
       />
+      <div className="bank-list">
       {withBalance > 1 && (
         <section className="panel bank-total" aria-label="Saldo somado dos bancos">
           <span>Saldo em todos os bancos</span>
@@ -130,6 +131,7 @@ export default function Cards({
           {loose.map((card) => cardEntry(card))}
         </section>
       )}
+      </div>
     </>
   );
 }

@@ -26,7 +26,9 @@
 .card-limit-bar { display: block; height: 6px; margin-top: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .card-limit-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 /* Bancos screen: one panel per bank, its balance on top and its cards inside. */
+.bank-list { display: grid; gap: 16px; }
 .bank-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.bank-head:last-child { padding-bottom: 0; border-bottom: 0; }
 .bank-head .transaction-info strong { font-size: 1rem; }
 .bank-balance { flex: none; font-size: 1.15rem; font-weight: 760; font-variant-numeric: tabular-nums; }
 .bank-balance.negative, .bank-total .negative { color: var(--danger); }

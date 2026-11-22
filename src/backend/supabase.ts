@@ -12,6 +12,7 @@ import type {
   Account,
   Assistant,
   BankConnections,
+  PluggyApp,
   FinanceService,
   Entry,
   Dashboard,
@@ -124,12 +125,15 @@ export function createSupabaseService(
     return result as T;
   };
   const bankConnections: BankConnections = {
+    app: () => api("app", "GET"),
+    saveApp: (clientId, clientSecret) => api<{ own: PluggyApp }>("app", "PUT", { clientId, clientSecret }).then((r) => r.own),
+    removeApp: () => api<void>("app", "DELETE"),
     async list() {
       const { data, error } = await db.from("pluggy_items")
-        .select("item_id, connector_name, status, last_synced_at").order("created_at");
+        .select("item_id, connector_name, status, last_synced_at, own_app").order("created_at");
       fail(error);
       return (data ?? []).map((x) => ({
-        itemId: x.item_id, bank: x.connector_name, status: x.status, lastSyncedAt: x.last_synced_at,
+        itemId: x.item_id, bank: x.connector_name, status: x.status, lastSyncedAt: x.last_synced_at, ownApp: Boolean(x.own_app),
       }));
     },
     connectToken: (itemId) => api<{ connectToken: string }>("connect-token", "POST", { itemId }).then((r) => r.connectToken),

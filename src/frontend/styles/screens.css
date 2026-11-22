@@ -505,6 +505,12 @@
 .open-finance-guide .text-button { justify-self: start; display: inline-flex; align-items: center; gap: 5px; }
 .bank-connect-widget { display: flex; margin: 16px 0 4px; font-size: .8rem; color: var(--muted); }
 @media (max-width: 480px) { .bank-link { grid-template-columns: 1fr; } }
+.pluggy-app { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pluggy-app h3 { margin: 0 0 4px; font-size: .9rem; }
+.pluggy-app .form-details { border-top: 0; }
+.pluggy-app-form { display: grid; gap: 12px; margin-top: 10px; }
+.pluggy-app-form .field input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+.pluggy-app-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 
 /* ——— Push notifications (Perfil → Notificações) ——— */
 .push-settings { display: grid; gap: 12px; margin-bottom: 16px; }

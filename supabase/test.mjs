@@ -152,6 +152,10 @@ assert.equal((await db.query("select item_id from public.pluggy_items")).rows[0]
 assert.equal((await db.query("select card_id from public.pluggy_accounts")).rows[0].card_id, card);
 await assert.rejects(() => db.query("delete from public.pluggy_items where item_id='item-1' returning item_id").then(({ rows }) => { if (!rows.length) throw new Error('no rows'); }));
 await assert.rejects(() => db.query("select * from public.pluggy_events"));
+// Own Pluggy app: the browser never reads or writes the credentials, not even its own row.
+await assert.rejects(() => db.query("select * from public.pluggy_credentials"));
+await assert.rejects(() => db.query("insert into public.pluggy_credentials(user_id,client_id,client_secret,webhook_token_hash) values ($1,'c','s','h')", [owner]));
+assert.equal((await db.query("select own_app from public.pluggy_items")).rows[0].own_app, false);
 assert.equal((await db.query("select source from public.transactions where external_id='tx-1'")).rows[0].source, 'pluggy');
 const thisMonth=(await db.query("select date_trunc('month', now() at time zone 'America/Sao_Paulo')::date::text as m")).rows[0].m;
 const runningOnCard=(await db.query("select public.save_recurrence($1::jsonb,null) as id",[JSON.stringify({description:'Academia',amount:-9900,kind:'expense',category:'Saúde',startMonth:'2026-01-01',day:5,cardId:card})])).rows[0].id;

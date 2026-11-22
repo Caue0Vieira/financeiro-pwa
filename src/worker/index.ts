@@ -6,6 +6,7 @@ import { manifestFor } from "./manifest";
 import { mapTransaction, purchasesAreNegative } from "./mapping";
 import { PluggyError, pluggyClient, tokenHeader, validSignature, validToken, type Pluggy } from "./pluggy";
 import { deleteTransactions, syncItem } from "./sync";
+import { hashToken, newToken, open as openSecret, seal as sealSecret, validKey } from "./credentials";
 import { pruneLog, runNotices, saoPauloClock, SubrequestBudget } from "./notifications";
 import { generateSummaries } from "./summaries";
 import { summaryFrom } from "../summary";
@@ -21,9 +22,12 @@ import { sendPush, type VapidKeys } from "./webpush";
 export type Env = {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  PLUGGY_CLIENT_ID: string;
-  PLUGGY_CLIENT_SECRET: string;
-  PLUGGY_WEBHOOK_SECRET: string;
+  /** The server's Pluggy application (optional: each user may register their own instead). */
+  PLUGGY_CLIENT_ID?: string;
+  PLUGGY_CLIENT_SECRET?: string;
+  PLUGGY_WEBHOOK_SECRET?: string;
+  /** 32 random bytes (hex) sealing each user's own Pluggy client secret (see credentials.ts). */
+  PLUGGY_CREDENTIALS_KEY?: string;
   /** Workers AI: classifies what no learned rule or merchant pattern covered. */
   AI?: Ai;
   /** Web Push (VAPID): raw P-256 public point and private scalar, base64url. See README. */
@@ -34,7 +38,8 @@ export type Env = {
 /** VAPID "sub": how a push service reaches whoever sends (Apple requires https: or mailto:). */
 const appUrl = "https://financeiro-pwa.cauevieira-dev07.workers.dev";
 type Context = { waitUntil(promise: Promise<unknown>): void };
-type Services = { env: Env; db: SupabaseClient; pluggy: Pluggy };
+/** `server`: the server's Pluggy application, when PLUGGY_CLIENT_ID and _SECRET are set. */
+type Services = { env: Env; db: SupabaseClient; server: Pluggy | null };
 
 /** Workers AI pass over the user's uncategorised expenses; never fails the caller. */
 const autoCategorize = ({ env, db }: Services, userId: string) =>
@@ -67,12 +72,53 @@ async function signedInUser({ db }: Pick<Services, "db">, request: Request) {
   return data.user.id;
 }
 
+type CredentialsRow = { user_id: string; client_id: string; client_secret: string; webhook_id: string | null };
+type OwnApp = { clientId: string; webhookId: string | null; pluggy: Pluggy };
+
+const credentialsKey = (env: Env) => {
+  const key = env.PLUGGY_CREDENTIALS_KEY;
+  if (!validKey(key)) throw new HttpError(503, "Aplicação própria da Pluggy ainda não configurada no servidor.");
+  return key;
+};
+
+async function ownAppFrom(env: Env, row: CredentialsRow): Promise<OwnApp> {
+  const secret = await openSecret(row.client_secret, credentialsKey(env), row.user_id);
+  return { clientId: row.client_id, webhookId: row.webhook_id, pluggy: pluggyClient(row.client_id, secret) };
+}
+
+/** The user's own Pluggy application (Perfil → Open Finance), or null when they have none. */
+async function ownApp({ env, db }: Services, userId: string) {
+  const { data, error } = await db.from("pluggy_credentials")
+    .select("user_id, client_id, client_secret, webhook_id").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data ? ownAppFrom(env, data as CredentialsRow) : null;
+}
+
+function serverApp({ server }: Services) {
+  if (!server) throw new HttpError(409, "Cadastre a sua aplicação da Pluggy nesta tela para conectar bancos.");
+  return server;
+}
+
+/** The application a stored connection was made with. */
+async function appFor(services: Services, userId: string, own: boolean) {
+  if (!own) return serverApp(services);
+  const app = await ownApp(services, userId);
+  if (!app) throw new HttpError(409, "A aplicação da Pluggy desta conexão foi removida. Cadastre-a de novo.");
+  return app.pluggy;
+}
+
+/** New connections use the user's own application when there is one, else the server's. */
+async function newConnectionApp(services: Services, userId: string) {
+  const app = await ownApp(services, userId);
+  return app ? { pluggy: app.pluggy, own: true } : { pluggy: serverApp(services), own: false };
+}
+
 async function ownedItem({ db }: Services, userId: string, itemId: unknown) {
   if (typeof itemId !== "string" || !itemId) throw new HttpError(400, "Conexão inválida.");
-  const { data, error } = await db.from("pluggy_items").select("item_id").eq("item_id", itemId).eq("user_id", userId).maybeSingle();
+  const { data, error } = await db.from("pluggy_items").select("item_id, own_app").eq("item_id", itemId).eq("user_id", userId).maybeSingle();
   if (error) throw error;
   if (!data) throw new HttpError(404, "Conexão não encontrada.");
-  return itemId;
+  return { itemId, own: Boolean(data.own_app) };
 }
 
 const body = async (request: Request) => (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -80,8 +126,10 @@ const body = async (request: Request) => (await request.json().catch(() => ({}))
 async function connectToken(services: Services, request: Request) {
   const userId = await signedInUser(services, request);
   const { itemId } = await body(request);
-  if (itemId !== undefined) await ownedItem(services, userId, itemId);
-  return json({ connectToken: await services.pluggy.connectToken(userId, itemId as string | undefined) });
+  const pluggy = itemId !== undefined
+    ? await appFor(services, userId, (await ownedItem(services, userId, itemId)).own)
+    : (await newConnectionApp(services, userId)).pluggy;
+  return json({ connectToken: await pluggy.connectToken(userId, itemId as string | undefined) });
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -89,31 +137,117 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
  * Stores an item and imports it. Two origins: Pluggy Connect in the app (the item carries this
  * user's clientUserId) or a connection made in the Pluggy Dashboard, as Meu Pluggy requires
- * (no clientUserId; the id is pasted in the app). Pluggy only returns items of this
- * application, and an item already linked to another user is refused below.
+ * (no clientUserId; the id is pasted in the app). The item is looked up in the user's own
+ * Pluggy application when they registered one, else in the server's; Pluggy only returns items
+ * of that application, and an item already linked to another user is refused below.
  */
 async function registerItem(services: Services, request: Request, context: Context) {
   const userId = await signedInUser(services, request);
   const { itemId } = await body(request);
   if (typeof itemId !== "string" || !uuid.test(itemId.trim())) throw new HttpError(400, "ID de conexão inválido.");
-  const item = await services.pluggy.item(itemId.trim()).catch((error) => {
-    if (error instanceof PluggyError && (error.status === 404 || error.status === 400)) {
-      throw new HttpError(404, "Conexão não encontrada na sua aplicação da Pluggy.");
-    }
-    throw error;
-  });
-  if (item.clientUserId && item.clientUserId !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
-  const { data: existing, error } = await services.db.from("pluggy_items").select("user_id").eq("item_id", item.id).maybeSingle();
+  const id = itemId.trim();
+  const { data: existing, error } = await services.db.from("pluggy_items").select("user_id, own_app").eq("item_id", id).maybeSingle();
   if (error) throw error;
   if (existing && existing.user_id !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
+  const { pluggy, own } = existing
+    ? { pluggy: await appFor(services, userId, Boolean(existing.own_app)), own: Boolean(existing.own_app) }
+    : await newConnectionApp(services, userId);
+  const item = await pluggy.item(id).catch((failure) => {
+    if (failure instanceof PluggyError && (failure.status === 404 || failure.status === 400)) {
+      throw new HttpError(404, "Conexão não encontrada na sua aplicação da Pluggy.");
+    }
+    throw failure;
+  });
+  if (item.clientUserId && item.clientUserId !== userId) throw new HttpError(403, "Esta conexão não pertence à sua conta.");
   if (!existing) {
-    const saved = await services.db.from("pluggy_items")
-      .insert({ user_id: userId, item_id: item.id, connector_name: item.connector.name, status: item.status ?? null });
+    const saved = await services.db.from("pluggy_items").insert({
+      user_id: userId, item_id: item.id, connector_name: item.connector.name, status: item.status ?? null, own_app: own,
+    });
     if (saved.error) throw saved.error;
   }
-  const result = await syncItem(services.db, services.pluggy, userId, item.id);
+  const result = await syncItem(services.db, pluggy, userId, item.id);
   context.waitUntil(autoCategorize(services, userId));
   return json(result);
+}
+
+/** GET /api/pluggy/app: whether the user registered their own Pluggy application. */
+async function appStatus(services: Services, request: Request) {
+  const userId = await signedInUser(services, request);
+  const { data, error } = await services.db.from("pluggy_credentials")
+    .select("client_id, webhook_id").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return json({
+    own: data ? { clientId: data.client_id, webhook: Boolean(data.webhook_id) } : null,
+    serverApp: Boolean(services.server),
+    available: validKey(services.env.PLUGGY_CREDENTIALS_KEY),
+  });
+}
+
+async function ownAppConnections({ db }: Services, userId: string) {
+  const { count, error } = await db.from("pluggy_items").select("item_id", { count: "exact", head: true })
+    .eq("user_id", userId).eq("own_app", true);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * PUT /api/pluggy/app: checks the client id and secret with Pluggy, creates this app's webhook
+ * there (custom header with a fresh token, stored only as a hash) and saves the sealed secret.
+ * Saving again with the same client id rotates the secret and the webhook token.
+ */
+async function saveApp(services: Services, request: Request) {
+  const userId = await signedInUser(services, request);
+  const key = credentialsKey(services.env);
+  const { clientId, clientSecret } = await body(request);
+  const id = typeof clientId === "string" ? clientId.trim() : "";
+  const secret = typeof clientSecret === "string" ? clientSecret.trim() : "";
+  if (!uuid.test(id)) throw new HttpError(400, "O Client ID tem o formato 00000000-0000-0000-0000-000000000000.");
+  if (secret.length < 8 || secret.length > 256 || /\s/.test(secret)) throw new HttpError(400, "Client Secret inválido.");
+  if (id === services.env.PLUGGY_CLIENT_ID?.trim()) throw new HttpError(400, "Essa já é a aplicação do servidor; não precisa cadastrar.");
+  const { data: taken, error } = await services.db.from("pluggy_credentials").select("user_id").eq("client_id", id).neq("user_id", userId).limit(1);
+  if (error) throw error;
+  if (taken?.length) throw new HttpError(409, "Esta aplicação da Pluggy já está cadastrada em outra conta.");
+  const previous = await ownApp(services, userId).catch(() => null);
+  if (previous && previous.clientId !== id && (await ownAppConnections(services, userId)) > 0) {
+    throw new HttpError(409, "Desconecte os bancos da aplicação atual antes de trocar de aplicação.");
+  }
+
+  const pluggy = pluggyClient(id, secret);
+  await pluggy.verify().catch((failure) => {
+    if (failure instanceof PluggyError) throw new HttpError(400, "A Pluggy não aceitou esse Client ID e Client Secret.");
+    throw failure;
+  });
+  const token = newToken();
+  const webhookUrl = `${new URL(request.url).origin}/api/pluggy/webhook`;
+  const webhookId = await pluggy.createWebhook(webhookUrl, { "X-Webhook-Token": token }).catch((failure) => {
+    console.error("pluggy own webhook", failure);
+    return null;
+  });
+  const saved = await services.db.from("pluggy_credentials").upsert({
+    user_id: userId,
+    client_id: id,
+    client_secret: await sealSecret(secret, key, userId),
+    webhook_token_hash: await hashToken(token),
+    webhook_id: webhookId,
+    updated_at: new Date().toISOString(),
+  });
+  if (saved.error) throw saved.error;
+  // The old webhook now carries a token nobody accepts; remove it when Pluggy lets us.
+  if (previous?.webhookId) await previous.pluggy.deleteWebhook(previous.webhookId).catch(() => undefined);
+  return json({ own: { clientId: id, webhook: Boolean(webhookId) } });
+}
+
+/** DELETE /api/pluggy/app: only once no connection depends on the application. */
+async function removeApp(services: Services, request: Request) {
+  const userId = await signedInUser(services, request);
+  if ((await ownAppConnections(services, userId)) > 0) {
+    throw new HttpError(409, "Desconecte os bancos desta aplicação antes de removê-la.");
+  }
+  const app = await ownApp(services, userId).catch(() => null);
+  if (app?.webhookId) await app.pluggy.deleteWebhook(app.webhookId).catch(() => undefined);
+  const { error } = await services.db.from("pluggy_credentials").delete().eq("user_id", userId);
+  if (error) throw error;
+  return json({ ok: true });
 }
 
 /**
@@ -124,10 +258,10 @@ async function registerItem(services: Services, request: Request, context: Conte
  */
 async function syncOne(services: Services, request: Request, context: Context, itemId: string) {
   const userId = await signedInUser(services, request);
-  await ownedItem(services, userId, itemId);
+  const pluggy = await appFor(services, userId, (await ownedItem(services, userId, itemId)).own);
   // Meu Pluggy items refuse PATCH (they follow the original connection's daily sync); ignore.
-  await services.pluggy.refreshItem(itemId).catch(() => undefined);
-  const result = await syncItem(services.db, services.pluggy, userId, itemId);
+  await pluggy.refreshItem(itemId).catch(() => undefined);
+  const result = await syncItem(services.db, pluggy, userId, itemId);
   context.waitUntil(autoCategorize(services, userId));
   return json(result);
 }
@@ -135,12 +269,13 @@ async function syncOne(services: Services, request: Request, context: Context, i
 /** Older app versions: syncs only the connection updated longest ago. */
 async function syncStalest(services: Services, request: Request, context: Context) {
   const userId = await signedInUser(services, request);
-  const { data, error } = await services.db.from("pluggy_items").select("item_id").eq("user_id", userId)
+  const { data, error } = await services.db.from("pluggy_items").select("item_id, own_app").eq("user_id", userId)
     .order("last_synced_at", { ascending: true, nullsFirst: true }).limit(1);
   if (error) throw error;
-  const itemId = data?.[0]?.item_id as string | undefined;
-  if (!itemId) return json({ inserted: 0 });
-  const result = await syncItem(services.db, services.pluggy, userId, itemId);
+  const stalest = data?.[0];
+  if (!stalest) return json({ inserted: 0 });
+  const pluggy = await appFor(services, userId, Boolean(stalest.own_app));
+  const result = await syncItem(services.db, pluggy, userId, stalest.item_id as string);
   context.waitUntil(autoCategorize(services, userId));
   return json(result);
 }
@@ -153,8 +288,8 @@ async function categorize(services: Services, request: Request) {
 
 async function removeItem(services: Services, request: Request, itemId: string) {
   const userId = await signedInUser(services, request);
-  await ownedItem(services, userId, itemId);
-  await services.pluggy.deleteItem(itemId).catch((error) => {
+  const pluggy = await appFor(services, userId, (await ownedItem(services, userId, itemId)).own);
+  await pluggy.deleteItem(itemId).catch((error) => {
     if (!(error instanceof PluggyError && error.status === 404)) throw error;
   });
   // Imported transactions stay; only the connection and its account links go.
@@ -172,7 +307,7 @@ type WebhookEvent = {
 };
 
 /** Re-reads changed transactions and updates date, description and amount (keeps the user's category). */
-async function updateTransactions({ db, pluggy }: Services, userId: string, event: WebhookEvent) {
+async function updateTransactions(db: SupabaseClient, pluggy: Pluggy, userId: string, event: WebhookEvent) {
   if (!event.itemId || !event.accountId || !event.transactionIds?.length) return;
   const account = (await pluggy.accounts(event.itemId)).find(({ id }) => id === event.accountId);
   if (!account) return;
@@ -188,27 +323,49 @@ async function updateTransactions({ db, pluggy }: Services, userId: string, even
   }
 }
 
+/**
+ * Which application sent a webhook. The server's app proves it with PLUGGY_WEBHOOK_SECRET (HMAC
+ * signature or custom header token); a user's own app with the token created in saveApp, looked
+ * up by its hash. Null when neither matches.
+ */
+async function webhookSource({ env, db }: Services, request: Request, raw: string) {
+  const header = request.headers.get(tokenHeader);
+  const secret = env.PLUGGY_WEBHOOK_SECRET ?? "";
+  if (validToken(header, secret) || (await validSignature(request.headers.get("x-pluggy-signature"), raw, secret))) {
+    return { own: false as const };
+  }
+  if (!header || header.trim().length < 32) return null;
+  const { data, error } = await db.from("pluggy_credentials")
+    .select("user_id, client_id, client_secret, webhook_id").eq("webhook_token_hash", await hashToken(header)).maybeSingle();
+  if (error) throw error;
+  return data ? { own: true as const, row: data as CredentialsRow } : null;
+}
+
 async function webhook(services: Services, request: Request, context: Context) {
   const raw = await request.text();
-  const secret = services.env.PLUGGY_WEBHOOK_SECRET ?? "";
-  // Either Pluggy's HMAC signature (signing secret) or the custom header token set in the dashboard.
-  const authentic = validToken(request.headers.get(tokenHeader), secret)
-    || (await validSignature(request.headers.get("x-pluggy-signature"), raw, secret));
-  if (!authentic) return json({ error: "unauthorized" }, 401);
-  const event = JSON.parse(raw) as WebhookEvent;
+  const source = await webhookSource(services, request, raw);
+  if (!source) return json({ error: "unauthorized" }, 401);
+  const event = JSON.parse(raw) as WebhookEvent & { clientId?: string };
+  if (source.own && event.clientId && event.clientId !== source.row.client_id) return json({ error: "unauthorized" }, 401);
   if (event.eventId) {
     const seen = await services.db.from("pluggy_events").insert({ event_id: event.eventId });
     if (seen.error?.code === "23505") return json({ ok: true, duplicate: true });
     if (seen.error) throw seen.error;
   }
   if (!event.itemId) return json({ ok: true });
-  const { data: owner, error } = await services.db.from("pluggy_items").select("user_id").eq("item_id", event.itemId).maybeSingle();
+  const { data: owner, error } = await services.db.from("pluggy_items").select("user_id, own_app").eq("item_id", event.itemId).maybeSingle();
   if (error) throw error;
-  if (!owner) return json({ ok: true, ignored: true });
+  // An app may only speak for its own connections: the server's for own_app = false, a user's
+  // app only for that user's own_app = true.
+  const sameApp = owner && (source.own
+    ? owner.own_app === true && owner.user_id === source.row.user_id
+    : owner.own_app !== true);
+  if (!owner || !sameApp) return json({ ok: true, ignored: true });
   const userId = owner.user_id as string;
 
   // Pluggy expects a 2xx within 10 s: answer now, work after the response.
   context.waitUntil((async () => {
+    const pluggy = source.own ? (await ownAppFrom(services.env, source.row)).pluggy : serverApp(services);
     switch (event.event) {
       case "item/deleted":
         await services.db.from("pluggy_items").delete().eq("item_id", event.itemId);
@@ -222,12 +379,12 @@ async function webhook(services: Services, request: Request, context: Context) {
         await deleteTransactions(services.db, userId, event.transactionIds ?? []);
         break;
       case "transactions/updated":
-        await updateTransactions(services, userId, event);
+        await updateTransactions(services.db, pluggy, userId, event);
         break;
       case "item/created":
       case "item/updated":
       case "transactions/created":
-        await syncItem(services.db, services.pluggy, userId, event.itemId!);
+        await syncItem(services.db, pluggy, userId, event.itemId!);
         await autoCategorize(services, userId);
         await notifyLargeExpenses(services.env, userId);
         break;
@@ -244,12 +401,18 @@ async function webhook(services: Services, request: Request, context: Context) {
  * comes around every few hours.
  */
 async function syncStalestItem(services: Services) {
-  const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id")
-    .order("last_synced_at", { ascending: true, nullsFirst: true }).limit(1);
+  const { data, error } = await services.db.from("pluggy_items").select("item_id, user_id, own_app")
+    .order("last_synced_at", { ascending: true, nullsFirst: true }).limit(3);
   if (error) throw error;
-  for (const { item_id, user_id } of data ?? []) {
-    await syncItem(services.db, services.pluggy, user_id, item_id)
+  // A connection whose app can't be used (credentials removed or unreadable) fails before any
+  // Pluggy call; move on to the next one so it doesn't hold up everybody else's backup.
+  for (const { item_id, user_id, own_app } of data ?? []) {
+    const pluggy = await appFor(services, user_id, Boolean(own_app))
+      .catch((failure) => console.error("pluggy scheduled sync app", item_id, failure));
+    if (!pluggy) continue;
+    await syncItem(services.db, pluggy, user_id, item_id)
       .catch((failure) => console.error("pluggy scheduled sync", item_id, failure));
+    break;
   }
   // Also covers CSV/OFX imports and anything a previous pass missed.
   if (services.env.AI) {
@@ -268,7 +431,7 @@ function servicesFor(env: Env): Services {
   return {
     env,
     db: database(env),
-    pluggy: pluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET),
+    server: serverConfigured(env) ? pluggyClient(env.PLUGGY_CLIENT_ID!, env.PLUGGY_CLIENT_SECRET!) : null,
   };
 }
 
@@ -407,8 +570,10 @@ async function chat(env: Env, request: Request) {
   }
 }
 
+const serverConfigured = (env: Env) => Boolean(env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
+/** Open Finance works with the server's Pluggy app, with users' own apps, or both. */
 const configured = (env: Env) =>
-  Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET);
+  Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && (serverConfigured(env) || validKey(env.PLUGGY_CREDENTIALS_KEY)));
 
 export default {
   async scheduled(controller: { scheduledTime: number }, env: Env, context: Context) {
@@ -442,6 +607,11 @@ export default {
       const itemRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)$/);
       const itemSyncRoute = pathname.match(/^\/api\/pluggy\/items\/([^/]+)\/sync$/);
       if (request.method === "POST" && pathname === "/api/pluggy/webhook") return await webhook(services, request, context);
+      if (pathname === "/api/pluggy/app") {
+        if (request.method === "GET") return await appStatus(services, request);
+        if (request.method === "PUT") return await saveApp(services, request);
+        if (request.method === "DELETE") return await removeApp(services, request);
+      }
       if (request.method === "POST" && pathname === "/api/pluggy/connect-token") return await connectToken(services, request);
       if (request.method === "POST" && pathname === "/api/pluggy/items") return await registerItem(services, request, context);
       if (request.method === "POST" && itemSyncRoute) return await syncOne(services, request, context, decodeURIComponent(itemSyncRoute[1]));

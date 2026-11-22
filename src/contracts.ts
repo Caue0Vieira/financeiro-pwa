@@ -335,8 +335,25 @@ export interface Assistant {
   ask(question: string, context: string, history: AssistantTurn[], onText: (text: string) => void): Promise<string>;
 }
 
-export interface BankConnection { itemId: string; bank: string; status: string | null; lastSyncedAt: string | null }
+export interface BankConnection {
+  itemId: string; bank: string; status: string | null; lastSyncedAt: string | null;
+  /** Made with the user's own Pluggy application (else the server's). */
+  ownApp: boolean;
+}
+/** The user's own Pluggy application, needed because Meu Pluggy only accepts the holder's accounts. */
+export interface PluggyApp { clientId: string; /** Whether the Worker created the webhook in that app. */ webhook: boolean }
+export interface PluggyAppStatus {
+  own: PluggyApp | null;
+  /** Whether the server has its own Pluggy app (used when the user registered none). */
+  serverApp: boolean;
+  /** Whether the server can store users' own apps (PLUGGY_CREDENTIALS_KEY set). */
+  available: boolean;
+}
 export interface BankConnections {
+  app(): Promise<PluggyAppStatus>;
+  /** Checks the credentials with Pluggy and creates the webhook there; the secret stays on the server. */
+  saveApp(clientId: string, clientSecret: string): Promise<PluggyApp>;
+  removeApp(): Promise<void>;
   list(): Promise<BankConnection[]>;
   /** Short-lived token for the Pluggy Connect widget (new connection, or `itemId` to reconnect). */
   connectToken(itemId?: string): Promise<string>;

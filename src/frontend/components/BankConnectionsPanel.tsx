@@ -4,6 +4,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { BankIcon } from "./BankIcon";
 import { Icon } from "./common";
 import { PanelSkeleton } from "./Skeleton";
+import { PluggyAppForm } from "./PluggyAppForm";
 
 const relative = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 function syncedLabel(iso: string | null) {
@@ -159,6 +160,11 @@ export function BankConnectionsPanel({
           </div>
         </div>
       ))}
+      <PluggyAppForm
+        connections={connections}
+        hasConnections={list.some(({ ownApp }) => ownApp)}
+        showNotice={showNotice}
+      />
       <form
         className="bank-link"
         onSubmit={(event) => {

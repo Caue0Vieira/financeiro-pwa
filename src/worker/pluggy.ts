@@ -18,12 +18,16 @@ export class PluggyError extends Error {
   }
 }
 
-/** API keys last 2 hours and POST /auth is rate limited, so one key is shared per isolate. */
-let cachedKey: { key: string; clientId: string; expires: number } | undefined;
+/**
+ * API keys last 2 hours and POST /auth is rate limited, so each application's key is shared per
+ * isolate (one entry per client id: the server's app and each user's own app).
+ */
+const cachedKeys = new Map<string, { key: string; secret: string; expires: number }>();
 
 export function pluggyClient(clientId: string, clientSecret: string) {
   async function apiKey() {
-    if (cachedKey && cachedKey.clientId === clientId && cachedKey.expires > Date.now()) return cachedKey.key;
+    const cached = cachedKeys.get(clientId);
+    if (cached && cached.secret === clientSecret && cached.expires > Date.now()) return cached.key;
     const response = await fetch(`${api}/auth`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -31,7 +35,7 @@ export function pluggyClient(clientId: string, clientSecret: string) {
     });
     if (!response.ok) throw new PluggyError(response.status, "Falha ao autenticar na Pluggy.");
     const { apiKey: key } = (await response.json()) as { apiKey: string };
-    cachedKey = { key, clientId, expires: Date.now() + 110 * 60_000 };
+    cachedKeys.set(clientId, { key, secret: clientSecret, expires: Date.now() + 110 * 60_000 });
     return key;
   }
 
@@ -43,7 +47,7 @@ export function pluggyClient(clientId: string, clientSecret: string) {
       });
     let response = await send();
     if (response.status === 401) {
-      cachedKey = undefined; // revoked or expired early
+      cachedKeys.delete(clientId); // revoked or expired early
       response = await send();
     }
     if (!response.ok) throw new PluggyError(response.status, `Pluggy respondeu ${response.status} em ${path.split("?")[0]}.`);
@@ -51,6 +55,13 @@ export function pluggyClient(clientId: string, clientSecret: string) {
   }
 
   return {
+    /** Fails with a PluggyError when the client id and secret don't authenticate. */
+    verify: () => apiKey().then(() => undefined),
+    /** Webhook of this application for every event, sending `headers` with each delivery. */
+    createWebhook: (url: string, headers: Record<string, string>) =>
+      call<{ id: string }>("/webhooks", { method: "POST", body: JSON.stringify({ url, event: "all", headers }) })
+        .then(({ id }) => id),
+    deleteWebhook: (webhookId: string) => call<unknown>(`/webhooks/${encodeURIComponent(webhookId)}`, { method: "DELETE" }),
     connectToken: (clientUserId: string, itemId?: string) =>
       call<{ accessToken: string }>("/connect_token", {
         method: "POST",

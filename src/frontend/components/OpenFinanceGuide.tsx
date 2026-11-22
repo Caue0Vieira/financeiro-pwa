@@ -19,6 +19,11 @@ export function OpenFinanceGuide({ onOpenConnections }: { onOpenConnections: () 
           pessoal.
         </li>
         <li>
+          Se outra pessoa já usa a aplicação da Pluggy deste app, crie a sua própria aplicação (o Meu Pluggy só aceita
+          as contas do titular). Copie o <strong>Client ID</strong> e o <strong>Client Secret</strong> e cole em{" "}
+          <strong>Open Finance → Sua aplicação da Pluggy</strong>. O app cria o webhook nela sozinho.
+        </li>
+        <li>
           Nas configurações de conectores da aplicação, ative o <strong>MeuPluggy</strong> se ele não aparecer na lista.
         </li>
         <li>

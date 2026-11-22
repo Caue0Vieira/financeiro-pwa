@@ -65,6 +65,19 @@ npx cf workers secrets update PLUGGY_WEBHOOK_SECRET --worker financeiro-pwa
 $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); (($b | ForEach-Object { $_.ToString('x2') }) -join '') | Set-Clipboard
 ```
 
+#### Uma aplicação da Pluggy por usuário
+
+O Meu Pluggy só aceita as contas do titular, então cada pessoa com conta no app precisa da própria aplicação da Pluggy (grátis em [dashboard.pluggy.ai](https://dashboard.pluggy.ai)). Ela cola o Client ID e o Client Secret em **Open Finance → Sua aplicação da Pluggy**. O Worker confere as credenciais com a Pluggy, cria nessa aplicação o webhook (evento `all`, header `X-Webhook-Token` com um token novo) e guarda o segredo cifrado com AES-GCM na tabela `pluggy_credentials`, que o navegador não acessa. O token do webhook fica só como hash. Quem não cadastrar uma aplicação continua usando a do servidor (`PLUGGY_CLIENT_ID`), e as conexões antigas seguem nela (`pluggy_items.own_app = false`).
+
+1. Aplique a migração [20261122120000_pluggy_own_app.sql](supabase/migrations/20261122120000_pluggy_own_app.sql).
+2. Cadastre o segredo `PLUGGY_CREDENTIALS_KEY`, com 32 bytes aleatórios em hex (o mesmo comando do token acima gera um valor válido). Trocar essa chave invalida as aplicações já salvas: cada pessoa precisa cadastrar a dela de novo.
+
+```sh
+npx cf workers secrets update PLUGGY_CREDENTIALS_KEY --worker financeiro-pwa
+```
+
+Para trocar de aplicação ou removê-la, desconecte antes os bancos feitos com ela. O cron continua sincronizando uma conexão por vez, de qualquer usuário. Com mais conexões, cada uma demora mais para ser sincronizada pelo backup, mas o webhook continua chegando na hora.
+
 No iPhone, abra o endereço publicado no Safari. Toque em **Compartilhar → Adicionar à Tela de Início** e ative **Abrir como App da Web** quando essa opção aparecer.
 
 ### Notificações push

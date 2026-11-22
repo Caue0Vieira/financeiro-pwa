@@ -21,6 +21,8 @@ export default defineConfig({
       PLUGGY_CLIENT_ID: bindings.secret(),
       PLUGGY_CLIENT_SECRET: bindings.secret(),
       PLUGGY_WEBHOOK_SECRET: bindings.secret(),
+      // Seals each user's own Pluggy client secret: see README → "Uma aplicação da Pluggy por usuário".
+      PLUGGY_CREDENTIALS_KEY: bindings.secret(),
       // Web Push (VAPID): see README → "Notificações push".
       VAPID_PUBLIC_KEY: bindings.secret(),
       VAPID_PRIVATE_KEY: bindings.secret(),

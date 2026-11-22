@@ -164,7 +164,7 @@ export function createSupabaseService(
       });
       if (!response.ok || !response.body) {
         const result = await response.json().catch(() => ({}));
-        throw new Error(result.error ?? "O assistente não respondeu. Tente de novo.");
+        throw new Error(result.error ?? "O Nix não respondeu. Tente de novo.");
       }
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let answer = "";

@@ -576,9 +576,9 @@ const demoAssistant: Assistant = {
       .filter((line) => /^(Mês mais apertado|Meses que ficam|Nenhum mês|Meta mensal|Sobra média|Limite disponível|Recebido no mês)/.test(line));
     const actions = demoActions(question);
     const answer = actions
-      ? `Na demonstração o assistente não usa a IA; na sua conta, ela entende o pedido e propõe o cadastro.${actions}`
+      ? `Na demonstração o Nix não usa a IA; na sua conta, ele entende o pedido e propõe o cadastro.${actions}`
       : [
-        'Na demonstração o assistente não usa a IA; na sua conta, ela explica estes números em linguagem natural.',
+        'Na demonstração o Nix não usa a IA; na sua conta, ele explica estes números em linguagem natural.',
         ...(key.length ? key.map((line) => `• ${line}`) : [`Sua pergunta foi: "${question}".`]),
       ].join('\n');
     for (const word of answer.split(/(?<= )/)) {

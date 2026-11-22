@@ -5,6 +5,7 @@ import MoneyField from "../components/MoneyField";
 import { Field } from "../components/Field";
 import { Select } from "../components/Select";
 import { Icon, PageHeading, type IconName } from "../components/common";
+import { Nix, type NixMood } from "../components/Nix";
 import { findMerchant, inferCategory } from "../merchants";
 import { cardLabel, money } from "../format";
 import {
@@ -146,7 +147,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
       },
     ]);
     if (!commands.assistant) {
-      update(answerId, (m) => ({ ...m, content: "O assistente não está disponível nesta conta.", failed: true }));
+      update(answerId, (m) => ({ ...m, content: "O Nix não está disponível nesta conta.", failed: true }));
       return;
     }
     setBusy(true);
@@ -160,7 +161,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
       const proposals = proposalsFrom(actions, { cards, today, accounts: data.accounts });
       update(answerId, (m) => ({ ...m, content: shown, proposals: proposals.length ? proposals : undefined }));
     } catch (failure) {
-      const message = failure instanceof Error ? failure.message : "O assistente não respondeu.";
+      const message = failure instanceof Error ? failure.message : "O Nix não respondeu.";
       update(answerId, (m) => ({ ...m, content: m.content || message, failed: !m.content }));
     } finally {
       setBusy(false);
@@ -206,7 +207,7 @@ export default function Assistant({ data, commands, showNotice }: Props) {
   return (
     <div className="assistant-page">
       <PageHeading
-        title="Assistente"
+        title="Nix"
         action={
           messages.length ? (
             <button className="button secondary assistant-clear" type="button" onClick={clear} disabled={busy}>
@@ -216,16 +217,14 @@ export default function Assistant({ data, commands, showNotice }: Props) {
         }
       />
 
-      <section className="assistant-thread" aria-label="Conversa com o assistente" aria-live="polite">
+      <section className="assistant-thread" aria-label="Conversa com o Nix" aria-live="polite">
         {!messages.length && (
           <div className="assistant-welcome">
-            <span className="assistant-avatar" aria-hidden="true">
-              <Icon name="sparkles" size={22} />
-            </span>
-            <h2>Como posso ajudar?</h2>
+            <Nix animated className="assistant-hero" />
+            <h2>Oi, eu sou o Nix</h2>
             <p>
-              Pergunte se uma compra cabe no seu orçamento, como está o mês ou peça para anotar receitas, contas e
-              parcelas. Eu proponho e você confirma antes de cadastrar.
+              Seu dragãozinho das finanças. Pergunte se uma compra cabe no orçamento, como está o mês ou peça para
+              anotar receitas, contas e parcelas. Eu proponho e você confirma antes de cadastrar.
             </p>
             <div className="assistant-suggestions">
               {suggestions.map(({ text, prompt }) => (
@@ -249,9 +248,12 @@ export default function Assistant({ data, commands, showNotice }: Props) {
           <div key={message.id} className={`assistant-turn ${message.role}`}>
             {message.simulation && <SimulationCard simulation={message.simulation} />}
             {(message.content || (busy && index === messages.length - 1)) && (
-              <p className={`assistant-message ${message.role}${message.failed ? " failed" : ""}`}>
-                {message.content || <span className="assistant-typing" aria-label="Escrevendo">•••</span>}
-              </p>
+              <div className="assistant-reply">
+                {message.role === "assistant" && <Nix mood={moodOf(message)} animated={index === messages.length - 1} className="assistant-face" />}
+                <p className={`assistant-message ${message.role}${message.failed ? " failed" : ""}`}>
+                  {message.content || <span className="assistant-typing" aria-label="Escrevendo">•••</span>}
+                </p>
+              </div>
             )}
             {message.simulation && !message.proposals?.length && !(busy && index === messages.length - 1) && (
               <button type="button" className="button secondary assistant-record" onClick={() => recordSimulation(message)}>
@@ -309,6 +311,17 @@ export default function Assistant({ data, commands, showNotice }: Props) {
       <small className="assistant-note">Análise automática dos seus dados, não é aconselhamento financeiro.</small>
     </div>
   );
+}
+
+/** Nix's face for an answer: worried when the purchase does not fit, celebrating when the savings goal holds. */
+function moodOf(message: ChatMessage): NixMood {
+  if (message.failed) return "alerta";
+  if (message.proposals?.some((p) => p.status === "saved")) return "feliz";
+  const simulation = message.simulation;
+  if (!simulation) return "normal";
+  if (simulation.negativeMonths.length || simulation.fitsLimit === false) return "alerta";
+  if (simulation.monthlyGoal > 0 && !simulation.monthsBelowGoal.length) return "meta";
+  return "normal";
 }
 
 function SimulationCard({ simulation }: { simulation: PurchaseSimulation }) {
@@ -504,8 +517,8 @@ function ProposalCard({
 export function AssistantBubble({ page, onOpen }: { page: Page; onOpen: () => void }) {
   if (page === "assistant") return null;
   return (
-    <button type="button" className="assistant-bubble" onClick={onOpen} aria-label="Abrir assistente">
-      <Icon name="chat" size={24} />
+    <button type="button" className="assistant-bubble" onClick={onOpen} aria-label="Falar com o Nix">
+      <Nix />
     </button>
   );
 }

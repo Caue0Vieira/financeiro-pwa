@@ -401,9 +401,9 @@ async function chat(env: Env, request: Request) {
   } catch (error) {
     if (error instanceof HttpError) return json({ error: error.message }, error.status);
     if (error instanceof ChatInputError) return json({ error: error.message }, 400);
-    if (quotaExceeded(error)) return json({ error: "O assistente atingiu o limite de hoje. Volta amanhã; a simulação continua funcionando." }, 429);
+    if (quotaExceeded(error)) return json({ error: "O Nix já respondeu o máximo de hoje. Volta amanhã; a simulação continua funcionando." }, 429);
     console.error("/api/chat", error);
-    return json({ error: "O assistente não respondeu. Tente de novo." }, 502);
+    return json({ error: "O Nix não respondeu. Tente de novo." }, 502);
   }
 }
 

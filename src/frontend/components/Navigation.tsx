@@ -14,7 +14,7 @@ export const workspace = [
   { id: "subscriptions", label: "Assinaturas", icon: "repeat" },
   { id: "investments", label: "Investimentos", icon: "chart" },
   { id: "goals", label: "Metas", icon: "goal" },
-  { id: "assistant", label: "Assistente", icon: "sparkles" },
+  { id: "assistant", label: "Nix", icon: "sparkles" },
 ] as const;
 
 export const account = [
